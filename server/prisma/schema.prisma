@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Faculty {
+  FIT
+  ISE
+}
+
+enum Proficiency {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum TeamStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum ApplicationDirection {
+  APPLICATION
+  INVITATION
+}
+
+enum ApplicationStatus {
+  SENT
+  VIEWED
+  ACCEPTED
+  DECLINED
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  googleId        String   @unique
+  name            String
+  avatarUrl       String?
+  faculty         Faculty?
+  studyYear       Int?
+  weeklyHours     Int?
+  githubUrl       String?
+  linkedinUrl     String?
+  telegramHandle  String?
+  profileComplete Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  skills         UserSkill[]
+  interests      UserInterest[]
+  preferredRoles UserPreferredRole[]
+  teamsCreated   Team[]              @relation("TeamCreator")
+  applications   Application[]
+}
+
+model Skill {
+  id   String @id @default(uuid())
+  name String @unique
+
+  users UserSkill[]
+}
+
+model UserSkill {
+  userId      String
+  skillId     String
+  proficiency Proficiency
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([userId, skillId])
+}
+
+model Interest {
+  id   String @id @default(uuid())
+  name String @unique
+
+  users UserInterest[]
+}
+
+model UserInterest {
+  userId     String
+  interestId String
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interestId])
+}
+
+model Role {
+  id   String @id @default(uuid())
+  name String @unique
+
+  preferredBy   UserPreferredRole[]
+  teamOpenRoles TeamOpenRole[]
+}
+
+model UserPreferredRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model Team {
+  id          String     @id @default(uuid())
+  name        String
+  eventTarget String?
+  description String?
+  status      TeamStatus @default(DRAFT)
+  creatorId   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  creator      User           @relation("TeamCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  openRoles    TeamOpenRole[]
+  applications Application[]
+}
+
+model TeamOpenRole {
+  id          String @id @default(uuid())
+  teamId      String
+  roleId      String
+  slotsTotal  Int
+  slotsFilled Int    @default(0)
+
+  team         Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  role         Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@unique([teamId, roleId])
+}
+
+model Application {
+  id             String               @id @default(uuid())
+  teamId         String
+  teamOpenRoleId String
+  userId         String
+  direction      ApplicationDirection
+  status         ApplicationStatus    @default(SENT)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  team         Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamOpenRole TeamOpenRole @relation(fields: [teamOpenRoleId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamOpenRoleId, userId, direction])
+}
