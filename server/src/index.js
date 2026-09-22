@@ -5,6 +5,7 @@ const cors = require('cors');
 const { errorHandler } = require('./middleware/errorHandler');
 const authRoutes = require('./routes/auth');
 const lookupsRoutes = require('./routes/lookups');
+const profileRoutes = require('./routes/profile');
 
 function createApp() {
   const app = express();
@@ -21,6 +22,7 @@ function createApp() {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/lookups', lookupsRoutes);
+  app.use('/api/profile', profileRoutes);
 
   app.use(errorHandler);
 
