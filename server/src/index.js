@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const { errorHandler } = require('./middleware/errorHandler');
 
 function createApp() {
   const app = express();
@@ -15,6 +16,8 @@ function createApp() {
   app.use(cookieParser());
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+  app.use(errorHandler);
 
   return app;
 }
