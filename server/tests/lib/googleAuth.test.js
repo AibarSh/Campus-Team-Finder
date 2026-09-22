@@ -21,3 +21,13 @@ test('verifyGoogleIdToken maps the Google payload to our profile shape', async (
     avatarUrl: 'https://example.com/pic.jpg',
   });
 });
+
+test('throws if GOOGLE_CLIENT_ID is not configured', async () => {
+  const original = process.env.GOOGLE_CLIENT_ID;
+  delete process.env.GOOGLE_CLIENT_ID;
+  try {
+    await expect(verifyGoogleIdToken('some-token')).rejects.toThrow('GOOGLE_CLIENT_ID is not configured');
+  } finally {
+    process.env.GOOGLE_CLIENT_ID = original;
+  }
+});
