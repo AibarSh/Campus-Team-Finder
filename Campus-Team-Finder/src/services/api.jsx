@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 // Central fetch wrapper enforcing JSON & cookie delivery
 async function apiFetch(endpoint, options = {}) {
@@ -20,7 +20,7 @@ async function apiFetch(endpoint, options = {}) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Request failed with status ${response.status}`);
+    throw new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
   }
 
   // Return empty object for 204 No Content
@@ -42,6 +42,12 @@ export const authApi = {
     }),
 
   getCurrentUser: () => apiFetch('/api/auth/me'),
+
+  devLogin: (email) =>
+    apiFetch('/api/auth/dev-login', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
 };
 
 // Flow 2 — Profile Setup API
@@ -57,19 +63,19 @@ export const profileApi = {
   updateSkills: (skills) =>
     apiFetch('/api/profile/skills', {
       method: 'PUT',
-      body: JSON.stringify(skills), // [{ skillId, proficiency }]
+      body: JSON.stringify({ skills }), // [{ skillId, proficiency }]
     }),
 
   updateInterests: (interestIds) =>
     apiFetch('/api/profile/interests', {
       method: 'PUT',
-      body: JSON.stringify(interestIds), // [interestId]
+      body: JSON.stringify({ interests: interestIds }),
     }),
 
   updatePreferredRoles: (roleIds) =>
     apiFetch('/api/profile/preferred-roles', {
       method: 'PUT',
-      body: JSON.stringify(roleIds), // [roleId]
+      body: JSON.stringify({ roles: roleIds }),
     }),
 
   completeProfile: () =>
@@ -87,11 +93,11 @@ export const lookupApi = {
 
 // Flow 3 — Find a Team API
 export const teamApi = {
+  // server's `skill` param matches open role names
   getTeams: (filters = {}) => {
     const params = new URLSearchParams();
-    if (filters.skill) params.append('skill', filters.skill);
+    if (filters.role) params.append('skill', filters.role);
     if (filters.faculty) params.append('faculty', filters.faculty);
-    if (filters.format) params.append('format', filters.format);
     const queryString = params.toString();
     return apiFetch(`/api/teams${queryString ? `?${queryString}` : ''}`);
   },
@@ -127,10 +133,10 @@ export const teamManagementApi = {
 
   getTeamApplications: (teamId) => apiFetch(`/api/teams/${teamId}/applications`),
 
-  inviteUser: (teamId, userId) =>
+  inviteUser: (teamId, userId, teamOpenRoleId) =>
     apiFetch(`/api/teams/${teamId}/invite`, {
       method: 'POST',
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, teamOpenRoleId }),
     }),
 
   respondToApplication: (applicationId, status) =>

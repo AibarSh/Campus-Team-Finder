@@ -1,13 +1,11 @@
 import { createContext, useState, useEffect } from 'react';
-import { authApi, profileApi } from '../services/api';
+import { authApi } from '../services/api';
 
 export const UserContext = createContext(null);
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [teams, setTeams] = useState([]);
-  const [applications, setApplications] = useState([]);
 
   const refreshUser = async () => {
     try {
@@ -40,10 +38,6 @@ export function UserProvider({ children }) {
         loading,
         refreshUser,
         logout,
-        teams,
-        setTeams,
-        applications,
-        setApplications,
       }}
     >
       {children}

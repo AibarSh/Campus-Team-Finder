@@ -1,20 +1,21 @@
-import React, { useState, useContext } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
+import { authApi } from '../services/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const navigate = useNavigate();
-  const context = useContext(UserContext);
+  const { setUser } = useContext(UserContext);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!email || !password) {
-      setError('Please fill in all fields');
+    if (!email) {
+      setError('Please enter your email');
       return;
     }
 
@@ -23,16 +24,16 @@ export default function LoginPage() {
       return;
     }
 
-    // Set default user state if context exists
-    if (context?.setUser) {
-      context.setUser((prev) => ({
-        ...prev,
-        email: email,
-      }));
+    setSubmitting(true);
+    try {
+      const { user } = await authApi.devLogin(email);
+      setUser(user);
+      navigate(user.profileComplete ? '/dashboard' : '/onboarding');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
-
-    // Navigate to dashboard or onboarding
-    navigate('/dashboard');
   };
 
   return (
@@ -74,40 +75,18 @@ export default function LoginPage() {
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-gray-700">
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError('');
-              }}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition"
-            />
-          </div>
-
           <button
             type="submit"
-            className="w-full py-3 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm"
+            disabled={submitting}
+            className="w-full py-3 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign In
+            {submitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        {/* Footer Link */}
-        <div className="text-center text-xs text-gray-500">
-          First time here?{' '}
-          <button
-            onClick={() => navigate('/onboarding')}
-            className="text-blue-600 font-semibold hover:underline"
-          >
-            Create your profile
-          </button>
-        </div>
+        <p className="text-center text-[11px] text-gray-400">
+          Development login — no password required
+        </p>
       </div>
     </div>
   );
