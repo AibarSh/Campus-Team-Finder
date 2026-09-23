@@ -27,13 +27,25 @@ export default function DashboardPage() {
     <div className="flex min-h-[calc(100vh-65px)]">
       <main className="flex-grow p-8 space-y-8">
         {/* Greeting Banner */}
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-950">
-            Good morning, {user?.firstName || user?.name} 👋
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Here's what's happening with your team search today.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-950">
+              Good morning, {user?.firstName || user?.name} 👋
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              Here's what's happening with your team search today.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search teams, skills, events..."
+                className="w-72 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 bg-white"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Stats Row */}
