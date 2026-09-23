@@ -7,11 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Faculty {
-  FIT
-  ISE
-}
-
 enum Proficiency {
   BEGINNER
   INTERMEDIATE
@@ -41,9 +36,13 @@ model User {
   email           String   @unique
   googleId        String   @unique
   name            String
+  firstName       String?
+  lastName        String?
+  bio             String?
   avatarUrl       String?
-  faculty         Faculty?
-  studyYear       Int?
+  faculty         String?
+  studyYear       String?
+  availability    String?
   weeklyHours     Int?
   githubUrl       String?
   linkedinUrl     String?

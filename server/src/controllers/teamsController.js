@@ -1,5 +1,6 @@
 const { prisma } = require('../lib/prisma');
 const { AppError } = require('../errors');
+const { FACULTIES } = require('../lib/profileOptions');
 
 async function requireTeamOwner(teamId, userId) {
   const team = await prisma.team.findUnique({ where: { id: teamId } });
@@ -95,6 +96,7 @@ async function listMyTeams(req, res, next) {
 async function listTeams(req, res, next) {
   try {
     const { skill, faculty } = req.query;
+    if (faculty && !FACULTIES.includes(faculty)) throw new AppError(400, 'faculty is not an allowed value');
     const teams = await prisma.team.findMany({
       where: {
         status: 'PUBLISHED',

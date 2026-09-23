@@ -3,6 +3,7 @@ const { createApp } = require('../../src/index');
 const { prisma } = require('../../src/lib/prisma');
 const { signSessionToken } = require('../../src/lib/jwt');
 const { resetDb } = require('../helpers/resetDb');
+const { FACULTIES } = require('../../src/lib/profileOptions');
 
 let cookie;
 let backendRole;
@@ -18,10 +19,10 @@ beforeEach(async () => {
   frontendRole = await prisma.role.create({ data: { name: 'Frontend' } });
 
   const fitCreator = await prisma.user.create({
-    data: { email: 'fit@kbtu.kz', googleId: 'g-fit', name: 'FIT Creator', faculty: 'FIT' },
+    data: { email: 'fit@kbtu.kz', googleId: 'g-fit', name: 'FIT Creator', faculty: FACULTIES[0] },
   });
   const iseCreator = await prisma.user.create({
-    data: { email: 'ise@kbtu.kz', googleId: 'g-ise', name: 'ISE Creator', faculty: 'ISE' },
+    data: { email: 'ise@kbtu.kz', googleId: 'g-ise', name: 'ISE Creator', faculty: FACULTIES[3] },
   });
 
   const published = await prisma.team.create({
@@ -51,7 +52,7 @@ test('lists only published teams by default', async () => {
 });
 
 test('filters by faculty', async () => {
-  const res = await request(createApp()).get('/api/teams?faculty=FIT').set('Cookie', [cookie]);
+  const res = await request(createApp()).get(`/api/teams?faculty=${encodeURIComponent(FACULTIES[0])}`).set('Cookie', [cookie]);
   expect(res.status).toBe(200);
   expect(res.body.map((t) => t.name)).toEqual(['Published FIT Backend Team']);
 });
@@ -63,7 +64,7 @@ test('filters by skill (matches open role name)', async () => {
 });
 
 test('GET /api/teams/:id returns team details with open roles', async () => {
-  const list = await request(createApp()).get('/api/teams?faculty=FIT').set('Cookie', [cookie]);
+  const list = await request(createApp()).get(`/api/teams?faculty=${encodeURIComponent(FACULTIES[0])}`).set('Cookie', [cookie]);
   const teamId = list.body[0].id;
   const res = await request(createApp()).get(`/api/teams/${teamId}`).set('Cookie', [cookie]);
   expect(res.status).toBe(200);
@@ -71,7 +72,7 @@ test('GET /api/teams/:id returns team details with open roles', async () => {
   expect(res.body.openRoles[0].role.name).toBe('Backend');
 });
 
-test('rejects an invalid faculty enum value with 400, not 500', async () => {
+test('rejects an unknown faculty value with 400', async () => {
   const res = await request(createApp()).get('/api/teams?faculty=NOT_A_REAL_FACULTY').set('Cookie', [cookie]);
   expect(res.status).toBe(400);
 });

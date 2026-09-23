@@ -1,16 +1,32 @@
 const { prisma } = require('../lib/prisma');
 const { AppError } = require('../errors');
+const { FACULTIES, STUDY_YEARS, AVAILABILITY } = require('../lib/profileOptions');
 
 const PATCHABLE_FIELDS = [
   'name',
   'avatarUrl',
+  'firstName',
+  'lastName',
+  'bio',
   'faculty',
   'studyYear',
-  'weeklyHours',
+  'availability',
   'githubUrl',
   'linkedinUrl',
   'telegramHandle',
 ];
+
+const ALLOWED_VALUES = { faculty: FACULTIES, studyYear: STUDY_YEARS, availability: AVAILABILITY };
+
+function validateField(field, value) {
+  if (value === null) return;
+  if (typeof value !== 'string') throw new AppError(400, `${field} must be a string`);
+  const max = field === 'bio' ? 1000 : 200;
+  if (value.length > max) throw new AppError(400, `${field} must be at most ${max} characters`);
+  if (ALLOWED_VALUES[field] && !ALLOWED_VALUES[field].includes(value)) {
+    throw new AppError(400, `${field} is not an allowed value`);
+  }
+}
 
 async function getProfile(req, res, next) {
   try {
@@ -32,7 +48,17 @@ async function patchProfile(req, res, next) {
   try {
     const data = {};
     for (const field of PATCHABLE_FIELDS) {
-      if (req.body[field] !== undefined) data[field] = req.body[field];
+      if (req.body[field] !== undefined) {
+        if (field === 'name' && !req.body.name) throw new AppError(400, 'name cannot be empty');
+        validateField(field, req.body[field]);
+        data[field] = req.body[field];
+      }
+    }
+    if (data.firstName !== undefined || data.lastName !== undefined) {
+      const first = data.firstName !== undefined ? data.firstName : req.user.firstName;
+      const last = data.lastName !== undefined ? data.lastName : req.user.lastName;
+      const full = [first, last].filter(Boolean).join(' ').trim();
+      if (full) data.name = full;
     }
     const updated = await prisma.user.update({ where: { id: req.user.id }, data });
     res.json(updated);
