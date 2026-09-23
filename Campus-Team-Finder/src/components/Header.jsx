@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import kbtuLogo from '../assets/kbtu_connect_logo.svg';
+import { UserContext } from '../context/UserContext';
+import { initials } from '../lib/names';
 
-function Header({ user, showProgress = false, progressStep = 0 }) {
+function Header({ showProgress = false, progressStep = 0 }) {
+  const { user } = useContext(UserContext);
   const [profileOpen, setProfileOpen] = useState(false);
 
   // Define progress steps from the design (image_1 to image_5)
@@ -32,19 +35,12 @@ function Header({ user, showProgress = false, progressStep = 0 }) {
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="w-10 h-10 rounded-full bg-blue-600 text-white font-semibold flex items-center justify-center text-lg"
               >
-                {/* Dynamically render user initials from Context */}
-                {user.initials || "AB"}
+                {initials(user)}
               </button>
               {profileOpen && <div className="absolute right-0 top-12 p-4 bg-white shadow-xl border rounded-lg w-48">Profile Menu</div>}
             </div>
           </>
-        ) : (
-          /* For Onboarding/Login headers */
-          <>
-            <button className="text-gray-700 hover:text-blue-600">Make a copy</button>
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Share</button>
-          </>
-        )}
+        ) : null}
       </div>
     </header>
   );

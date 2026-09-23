@@ -1,56 +1,58 @@
-import { useContext, useState } from 'react';
-import { UserContext } from '../context/UserContext';
+import { useEffect, useState } from 'react';
+import { lookupApi, teamApi } from '../services/api';
 import TeamCard from '../components/TeamCard';
 
-const CATEGORIES = ['All', 'AI/ML', 'Mobile', 'Web3', 'IoT', 'EdTech'];
-
 export default function BrowseTeamsPage() {
-  const { teams } = useContext(UserContext);
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [teams, setTeams] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [role, setRole] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const filteredTeams = selectedCategory === 'All'
-    ? teams
-    : teams.filter((t) => t.category === selectedCategory);
+  useEffect(() => {
+    lookupApi.getRoles().then(setRoles).catch(() => setRoles([]));
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setError('');
+    teamApi
+      .getTeams({ role })
+      .then(setTeams)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [role]);
 
   return (
     <main className="p-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-950">Browse Teams</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {filteredTeams.length} open teams looking for members
-          </p>
-        </div>
-
-        <button className="px-5 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition">
-          + Create Team
-        </button>
+      <div>
+        <h1 className="text-2xl font-extrabold text-gray-950">Browse Teams</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{teams.length} open teams looking for members</p>
       </div>
 
-      {/* Filter Tabs */}
       <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-        <div className="flex gap-2">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
-                selectedCategory === cat
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              {cat}
-            </button>
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          aria-label="Filter by open role"
+          className="px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 cursor-pointer"
+        >
+          <option value="">All roles</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.name}>{r.name}</option>
           ))}
-        </div>
-        <span className="text-xs text-gray-400 font-medium">{filteredTeams.length} results</span>
+        </select>
+        <span className="text-xs text-gray-400 font-medium">{teams.length} results</span>
       </div>
 
-      {/* Team Cards Grid */}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      {!loading && !error && teams.length === 0 && (
+        <p className="text-sm text-gray-500">No teams match this filter.</p>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTeams.map((team) => (
+        {teams.map((team) => (
           <TeamCard key={team.id} team={team} />
         ))}
       </div>
