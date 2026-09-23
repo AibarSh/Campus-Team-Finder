@@ -130,6 +130,47 @@ async function applyToRole(req, res, next) {
   }
 }
 
+async function listTeamApplications(req, res, next) {
+  try {
+    await requireTeamOwner(req.params.id, req.user.id);
+    const applications = await prisma.application.findMany({
+      where: { teamId: req.params.id, direction: 'APPLICATION' },
+      include: { user: true, teamOpenRole: { include: { role: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(applications);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function inviteUser(req, res, next) {
+  try {
+    const { userId, teamOpenRoleId } = req.body;
+    if (!userId || !teamOpenRoleId) throw new AppError(400, 'userId and teamOpenRoleId are required');
+
+    const team = await requireTeamOwner(req.params.id, req.user.id);
+    const teamOpenRole = await prisma.teamOpenRole.findFirst({
+      where: { id: teamOpenRoleId, teamId: team.id },
+    });
+    if (!teamOpenRole) throw new AppError(404, 'Role not found on this team');
+
+    const application = await prisma.application.create({
+      data: {
+        teamId: team.id,
+        teamOpenRoleId: teamOpenRole.id,
+        userId,
+        direction: 'INVITATION',
+        status: 'SENT',
+      },
+    });
+    res.status(201).json(application);
+  } catch (err) {
+    if (err.code === 'P2002') return next(new AppError(409, 'This user was already invited to this role'));
+    next(err);
+  }
+}
+
 module.exports = {
   requireTeamOwner,
   createTeam,
@@ -139,4 +180,6 @@ module.exports = {
   listTeams,
   getTeam,
   applyToRole,
+  listTeamApplications,
+  inviteUser,
 };
