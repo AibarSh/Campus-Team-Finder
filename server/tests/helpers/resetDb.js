@@ -1,6 +1,9 @@
 const { prisma } = require('../../src/lib/prisma');
 
 async function resetDb() {
+  if (!/_test$/.test(process.env.DATABASE_URL || '')) {
+    throw new Error('refusing to reset a non-test database');
+  }
   await prisma.application.deleteMany();
   await prisma.teamOpenRole.deleteMany();
   await prisma.team.deleteMany();

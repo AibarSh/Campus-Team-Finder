@@ -63,6 +63,64 @@ test('only the creator can set open roles, and publish requires at least one rol
   expect(publish.body.status).toBe('PUBLISHED');
 });
 
+test('PUT /:id/roles preserves existing Application rows and slotsFilled for unchanged roles', async () => {
+  const frontendRole = await prisma.role.create({ data: { name: 'Frontend' } });
+  const team = await prisma.team.create({ data: { name: 'Hack Squad', creatorId: owner.id } });
+
+  const setRoles = await request(createApp())
+    .put(`/api/teams/${team.id}/roles`)
+    .set('Cookie', [ownerCookie])
+    .send({
+      roles: [
+        { roleId: backendRole.id, slotsTotal: 2 },
+        { roleId: frontendRole.id, slotsTotal: 1 },
+      ],
+    });
+  expect(setRoles.status).toBe(200);
+  const backendOpenRole = setRoles.body.find((r) => r.roleId === backendRole.id);
+
+  const applicant = await prisma.user.create({
+    data: { email: 'applicant@kbtu.kz', googleId: 'g-applicant', name: 'Applicant', profileComplete: true },
+  });
+  const applicantCookie = `session=${signSessionToken(applicant.id)}`;
+
+  await prisma.team.update({ where: { id: team.id }, data: { status: 'PUBLISHED' } });
+  const applyRes = await request(createApp())
+    .post(`/api/teams/${team.id}/roles/${backendOpenRole.id}/apply`)
+    .set('Cookie', [applicantCookie]);
+  expect(applyRes.status).toBe(201);
+
+  const acceptRes = await request(createApp())
+    .patch(`/api/applications/${applyRes.body.id}`)
+    .set('Cookie', [ownerCookie])
+    .send({ status: 'ACCEPTED' });
+  expect(acceptRes.status).toBe(200);
+
+  const newRole = await prisma.role.create({ data: { name: 'Design' } });
+  const secondSet = await request(createApp())
+    .put(`/api/teams/${team.id}/roles`)
+    .set('Cookie', [ownerCookie])
+    .send({
+      roles: [
+        { roleId: backendRole.id, slotsTotal: 3 },
+        { roleId: newRole.id, slotsTotal: 1 },
+      ],
+    });
+  expect(secondSet.status).toBe(200);
+
+  const applicationsAfter = await prisma.application.findMany({ where: { teamId: team.id } });
+  expect(applicationsAfter).toHaveLength(1);
+  expect(applicationsAfter[0].id).toBe(applyRes.body.id);
+
+  const backendAfter = await prisma.teamOpenRole.findUnique({ where: { id: backendOpenRole.id } });
+  expect(backendAfter).not.toBeNull();
+  expect(backendAfter.slotsFilled).toBe(1);
+  expect(backendAfter.slotsTotal).toBe(3);
+
+  const frontendAfter = await prisma.teamOpenRole.findFirst({ where: { teamId: team.id, roleId: frontendRole.id } });
+  expect(frontendAfter).toBeNull();
+});
+
 test('GET /api/teams/mine lists teams created by the current user', async () => {
   await prisma.team.create({ data: { name: 'Team A', creatorId: owner.id } });
   const res = await request(createApp()).get('/api/teams/mine').set('Cookie', [ownerCookie]);

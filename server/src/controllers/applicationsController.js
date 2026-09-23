@@ -3,8 +3,9 @@ const { AppError } = require('../errors');
 
 async function listMyApplications(req, res, next) {
   try {
+    const direction = req.query.direction === 'INVITATION' ? 'INVITATION' : 'APPLICATION';
     const applications = await prisma.application.findMany({
-      where: { userId: req.user.id, direction: 'APPLICATION' },
+      where: { userId: req.user.id, direction },
       include: { team: true, teamOpenRole: { include: { role: true } } },
       orderBy: { createdAt: 'desc' },
     });
@@ -37,12 +38,20 @@ async function respondToApplication(req, res, next) {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      const current = await tx.application.findUnique({ where: { id: application.id } });
+      if (!current || !['SENT', 'VIEWED'].includes(current.status)) {
+        throw new AppError(409, 'This application has already been decided');
+      }
+
       if (status === 'ACCEPTED') {
         const role = await tx.teamOpenRole.findUnique({ where: { id: application.teamOpenRoleId } });
-        if (role.slotsFilled >= role.slotsTotal) {
+        const claim = await tx.teamOpenRole.updateMany({
+          where: { id: role.id, slotsFilled: { lt: role.slotsTotal } },
+          data: { slotsFilled: { increment: 1 } },
+        });
+        if (claim.count === 0) {
           throw new AppError(409, 'This role has no open slots left');
         }
-        await tx.teamOpenRole.update({ where: { id: role.id }, data: { slotsFilled: { increment: 1 } } });
       }
       return tx.application.update({ where: { id: application.id }, data: { status } });
     });

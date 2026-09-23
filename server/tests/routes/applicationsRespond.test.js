@@ -79,6 +79,68 @@ test('only the team creator can decide on an APPLICATION', async () => {
   expect(res.status).toBe(403);
 });
 
+test('accepting an already-accepted application is idempotent (rejects re-accept, does not double-fill)', async () => {
+  const application = await prisma.application.create({
+    data: { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: applicant.id, direction: 'APPLICATION' },
+  });
+
+  const first = await request(createApp())
+    .patch(`/api/applications/${application.id}`)
+    .set('Cookie', [ownerCookie])
+    .send({ status: 'ACCEPTED' });
+  expect(first.status).toBe(200);
+
+  let role = await prisma.teamOpenRole.findUnique({ where: { id: teamOpenRole.id } });
+  expect(role.slotsFilled).toBe(1);
+
+  const second = await request(createApp())
+    .patch(`/api/applications/${application.id}`)
+    .set('Cookie', [ownerCookie])
+    .send({ status: 'ACCEPTED' });
+  expect(second.status).toBe(409);
+
+  role = await prisma.teamOpenRole.findUnique({ where: { id: teamOpenRole.id } });
+  expect(role.slotsFilled).toBe(1);
+});
+
+test('rejects deciding on an already-declined application', async () => {
+  const application = await prisma.application.create({
+    data: { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: applicant.id, direction: 'APPLICATION' },
+  });
+
+  const decline = await request(createApp())
+    .patch(`/api/applications/${application.id}`)
+    .set('Cookie', [ownerCookie])
+    .send({ status: 'DECLINED' });
+  expect(decline.status).toBe(200);
+
+  const again = await request(createApp())
+    .patch(`/api/applications/${application.id}`)
+    .set('Cookie', [ownerCookie])
+    .send({ status: 'DECLINED' });
+  expect(again.status).toBe(409);
+});
+
+test('GET /api/applications/mine?direction=INVITATION returns invitations targeting the current user', async () => {
+  const invitation = await prisma.application.create({
+    data: {
+      teamId: team.id,
+      teamOpenRoleId: teamOpenRole.id,
+      userId: applicant.id,
+      direction: 'INVITATION',
+      status: 'SENT',
+    },
+  });
+
+  const res = await request(createApp())
+    .get('/api/applications/mine?direction=INVITATION')
+    .set('Cookie', [applicantCookie]);
+
+  expect(res.status).toBe(200);
+  expect(res.body.map((a) => a.id)).toContain(invitation.id);
+  expect(res.body.every((a) => a.direction === 'INVITATION')).toBe(true);
+});
+
 test('only the invited user can respond to an INVITATION', async () => {
   const invitation = await prisma.application.create({
     data: { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: applicant.id, direction: 'INVITATION' },

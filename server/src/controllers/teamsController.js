@@ -11,7 +11,7 @@ async function requireTeamOwner(teamId, userId) {
 async function createTeam(req, res, next) {
   try {
     const { name, eventTarget, description } = req.body;
-    if (!name) throw new AppError(400, 'name is required');
+    if (!name || !name.trim()) throw new AppError(400, 'name is required');
 
     const team = await prisma.team.create({
       data: { name, eventTarget, description, creatorId: req.user.id },
@@ -30,12 +30,30 @@ async function setOpenRoles(req, res, next) {
       throw new AppError(400, 'roles must be a non-empty array of { roleId, slotsTotal }');
     }
 
-    await prisma.$transaction([
-      prisma.teamOpenRole.deleteMany({ where: { teamId: team.id } }),
-      prisma.teamOpenRole.createMany({
-        data: roles.map((r) => ({ teamId: team.id, roleId: r.roleId, slotsTotal: r.slotsTotal })),
-      }),
-    ]);
+    const seenRoleIds = new Set();
+    for (const r of roles) {
+      if (!Number.isInteger(r.slotsTotal) || r.slotsTotal <= 0) {
+        throw new AppError(400, 'slotsTotal must be a positive integer');
+      }
+      if (seenRoleIds.has(r.roleId)) {
+        throw new AppError(400, 'duplicate roleId in roles array');
+      }
+      seenRoleIds.add(r.roleId);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.teamOpenRole.deleteMany({
+        where: { teamId: team.id, roleId: { notIn: [...seenRoleIds] } },
+      });
+
+      for (const r of roles) {
+        await tx.teamOpenRole.upsert({
+          where: { teamId_roleId: { teamId: team.id, roleId: r.roleId } },
+          update: { slotsTotal: r.slotsTotal },
+          create: { teamId: team.id, roleId: r.roleId, slotsTotal: r.slotsTotal },
+        });
+      }
+    });
 
     const updated = await prisma.teamOpenRole.findMany({
       where: { teamId: team.id },
@@ -65,7 +83,7 @@ async function listMyTeams(req, res, next) {
   try {
     const teams = await prisma.team.findMany({
       where: { creatorId: req.user.id },
-      include: { openRoles: { include: { role: true } } },
+      include: { openRoles: { include: { role: true, applications: true } } },
       orderBy: { createdAt: 'desc' },
     });
     res.json(teams);
@@ -133,8 +151,9 @@ async function applyToRole(req, res, next) {
 async function listTeamApplications(req, res, next) {
   try {
     await requireTeamOwner(req.params.id, req.user.id);
+    const direction = req.query.direction === 'INVITATION' ? 'INVITATION' : 'APPLICATION';
     const applications = await prisma.application.findMany({
-      where: { teamId: req.params.id, direction: 'APPLICATION' },
+      where: { teamId: req.params.id, direction },
       include: { user: true, teamOpenRole: { include: { role: true } } },
       orderBy: { createdAt: 'desc' },
     });

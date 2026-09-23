@@ -71,6 +71,11 @@ test('GET /api/teams/:id returns team details with open roles', async () => {
   expect(res.body.openRoles[0].role.name).toBe('Backend');
 });
 
+test('rejects an invalid faculty enum value with 400, not 500', async () => {
+  const res = await request(createApp()).get('/api/teams?faculty=NOT_A_REAL_FACULTY').set('Cookie', [cookie]);
+  expect(res.status).toBe(400);
+});
+
 test('GET /api/teams/:id 404s for a missing team', async () => {
   const res = await request(createApp()).get('/api/teams/00000000-0000-0000-0000-000000000000').set('Cookie', [cookie]);
   expect(res.status).toBe(404);
