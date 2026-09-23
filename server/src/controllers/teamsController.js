@@ -74,4 +74,45 @@ async function listMyTeams(req, res, next) {
   }
 }
 
-module.exports = { requireTeamOwner, createTeam, setOpenRoles, publishTeam, listMyTeams };
+async function listTeams(req, res, next) {
+  try {
+    const { skill, faculty } = req.query;
+    const teams = await prisma.team.findMany({
+      where: {
+        status: 'PUBLISHED',
+        ...(faculty ? { creator: { faculty } } : {}),
+        ...(skill
+          ? { openRoles: { some: { role: { name: { contains: skill, mode: 'insensitive' } } } } }
+          : {}),
+      },
+      include: { creator: true, openRoles: { include: { role: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(teams);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getTeam(req, res, next) {
+  try {
+    const team = await prisma.team.findUnique({
+      where: { id: req.params.id },
+      include: { creator: true, openRoles: { include: { role: true } } },
+    });
+    if (!team) throw new AppError(404, 'Team not found');
+    res.json(team);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = {
+  requireTeamOwner,
+  createTeam,
+  setOpenRoles,
+  publishTeam,
+  listMyTeams,
+  listTeams,
+  getTeam,
+};
