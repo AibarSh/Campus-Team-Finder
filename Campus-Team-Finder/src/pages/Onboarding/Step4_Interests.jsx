@@ -1,34 +1,24 @@
-import { useState } from 'react';
-
-const INTEREST_OPTIONS = [
-  'Artificial Intelligence',
-  'Web Development',
-  'Mobile Development',
-  'Game Development',
-  'Data Science',
-  'Blockchain / Web3',
-  'IoT & Embedded',
-  'Cybersecurity',
-  'UI/UX Design',
-  'Cloud Computing',
-];
-
-const ROLE_OPTIONS = [
-  'Frontend Developer',
-  'Backend Developer',
-  'Full Stack Developer',
-  'UI/UX Designer',
-  'ML Engineer',
-  'Data Scientist',
-  'Mobile Developer',
-  'DevOps Engineer',
-  'Project Manager',
-  'QA Engineer',
-];
+import { useEffect, useState } from 'react';
+import { lookupApi } from '../../services/api';
 
 export default function Step4_Interests({ data = {}, update }) {
   const [selectedInterests, setSelectedInterests] = useState(data.interests || []);
   const [selectedRoles, setSelectedRoles] = useState(data.roles || []);
+  const [interestOptions, setInterestOptions] = useState([]);
+  const [roleOptions, setRoleOptions] = useState([]);
+  const [loadError, setLoadError] = useState('');
+
+  const load = () => {
+    setLoadError('');
+    Promise.all([lookupApi.getInterests(), lookupApi.getRoles()])
+      .then(([interests, roles]) => {
+        setInterestOptions(interests);
+        setRoleOptions(roles);
+      })
+      .catch((err) => setLoadError(err.message));
+  };
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- load-once is intended
+  useEffect(load, []);
 
   const toggleInterest = (item) => {
     const updated = selectedInterests.includes(item)
@@ -50,6 +40,13 @@ export default function Step4_Interests({ data = {}, update }) {
 
   return (
     <div className="space-y-8">
+      {loadError && (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium flex items-center justify-between">
+          <span>Couldn't load options: {loadError}</span>
+          <button type="button" onClick={load} className="font-semibold underline">Retry</button>
+        </div>
+      )}
+
       {/* Interests Section */}
       <div className="space-y-3">
         <h3 className="text-base font-medium text-gray-900">Interests</h3>
@@ -58,20 +55,20 @@ export default function Step4_Interests({ data = {}, update }) {
         </p>
 
         <div className="flex flex-wrap gap-2.5 pt-1">
-          {INTEREST_OPTIONS.map((item) => {
-            const isSelected = selectedInterests.includes(item);
+          {interestOptions.map((item) => {
+            const isSelected = selectedInterests.includes(item.id);
             return (
               <button
-                key={item}
+                key={item.id}
                 type="button"
-                onClick={() => toggleInterest(item)}
+                onClick={() => toggleInterest(item.id)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   isSelected
                     ? 'bg-blue-50 border-2 border-blue-600 text-blue-600'
                     : 'bg-gray-50/50 border border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {item}
+                {item.name}
               </button>
             );
           })}
@@ -86,20 +83,20 @@ export default function Step4_Interests({ data = {}, update }) {
         </p>
 
         <div className="flex flex-wrap gap-2.5 pt-1">
-          {ROLE_OPTIONS.map((item) => {
-            const isSelected = selectedRoles.includes(item);
+          {roleOptions.map((item) => {
+            const isSelected = selectedRoles.includes(item.id);
             return (
               <button
-                key={item}
+                key={item.id}
                 type="button"
-                onClick={() => toggleRole(item)}
+                onClick={() => toggleRole(item.id)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   isSelected
                     ? 'bg-blue-50 border-2 border-blue-600 text-blue-600'
                     : 'bg-gray-50/50 border border-gray-200 text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {item}
+                {item.name}
               </button>
             );
           })}

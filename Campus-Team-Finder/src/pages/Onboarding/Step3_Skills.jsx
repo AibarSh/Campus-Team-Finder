@@ -1,107 +1,104 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { lookupApi } from '../../services/api';
 
-const POPULAR_SKILLS = [
-  'JavaScript', 'TypeScript', 'Python', 'React', 'Node.js', 'Java',
-  'C++', 'Kotlin', 'Figma', 'SQL', 'MongoDB', 'Docker',
-  'TensorFlow', 'Flutter',
+const LEVELS = [
+  { value: 'BEGINNER', label: 'Beginner' },
+  { value: 'INTERMEDIATE', label: 'Intermediate' },
+  { value: 'ADVANCED', label: 'Advanced' },
 ];
+const levelLabel = (value) => LEVELS.find((l) => l.value === value)?.label || value;
 
 export default function Step3_Skills({ data = [], update }) {
-  const [skills, setSkills] = useState(data.skills || []);
-  const [skillInput, setSkillInput] = useState('');
-  const [level, setLevel] = useState('Intermediate');
+  const [skills, setSkills] = useState(data);
+  const [options, setOptions] = useState([]);
+  const [loadError, setLoadError] = useState('');
+  const [query, setQuery] = useState('');
+  const [level, setLevel] = useState('INTERMEDIATE');
 
-  const addSkill = (skillName) => {
-    const nameToAdd = skillName || skillInput.trim();
-    if (!nameToAdd) return;
-    if (skills.some((s) => s.name.toLowerCase() === nameToAdd.toLowerCase())) return;
+  const load = () => {
+    setLoadError('');
+    lookupApi.getSkills().then(setOptions).catch((err) => setLoadError(err.message));
+  };
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- load-once is intended
+  useEffect(load, []);
 
-    const newSkills = [...skills, { name: nameToAdd, level }];
-    setSkills(newSkills);
-    setSkillInput('');
-    if (update) update(newSkills);
+  const change = (next) => {
+    setSkills(next);
+    if (update) update(next);
   };
 
-  const removeSkill = (index) => {
-    const newSkills = skills.filter((_, i) => i !== index);
-    setSkills(newSkills);
-    if (update) update(newSkills);
+  const addSkill = (option) => {
+    if (skills.some((s) => s.id === option.id)) return;
+    change([...skills, { id: option.id, name: option.name, level }]);
+    setQuery('');
   };
+
+  const removeSkill = (id) => change(skills.filter((s) => s.id !== id));
+
+  const available = options.filter(
+    (o) => !skills.some((s) => s.id === o.id) && o.name.toLowerCase().includes(query.trim().toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
-      {/* Input + Level Dropdown + Add Button */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-900">Add a skill</label>
         <div className="flex gap-3">
           <input
             type="text"
-            placeholder="e.g. React, Python, Figma..."
-            value={skillInput}
-            onChange={(e) => setSkillInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addSkill()}
+            placeholder="Search skills..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             className="flex-grow px-4 py-3 rounded-2xl border border-gray-200 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition"
           />
-
           <select
             value={level}
             onChange={(e) => setLevel(e.target.value)}
+            aria-label="Proficiency"
             className="px-4 py-3 rounded-2xl border border-gray-200 text-sm bg-white outline-none text-gray-700 cursor-pointer"
           >
-            <option value="Beginner">Beginner</option>
-            <option value="Intermediate">Intermediate</option>
-            <option value="Advanced">Advanced</option>
+            {LEVELS.map((l) => (
+              <option key={l.value} value={l.value}>{l.label}</option>
+            ))}
           </select>
-
-          <button
-            type="button"
-            onClick={() => addSkill()}
-            className="px-6 py-3 bg-blue-600 text-white font-semibold text-sm rounded-2xl hover:bg-blue-700 transition"
-          >
-            Add
-          </button>
         </div>
       </div>
 
-      {/* Quick Add Section */}
-      <div className="space-y-2">
-        <p className="text-xs text-gray-400 font-medium">Quick-add popular skills</p>
+      {loadError ? (
+        <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium flex items-center justify-between">
+          <span>Couldn't load skills: {loadError}</span>
+          <button type="button" onClick={load} className="font-semibold underline">Retry</button>
+        </div>
+      ) : (
         <div className="flex flex-wrap gap-2">
-          {POPULAR_SKILLS.map((skill) => (
+          {available.map((option) => (
             <button
-              key={skill}
+              key={option.id}
               type="button"
-              onClick={() => addSkill(skill)}
+              onClick={() => addSkill(option)}
               className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-medium text-gray-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition"
             >
-              + {skill}
+              + {option.name}
             </button>
           ))}
         </div>
-      </div>
+      )}
 
-      {/* Dynamic Skill List / Empty State Banner */}
       {skills.length === 0 ? (
         <div className="border-2 border-dashed border-gray-200 rounded-2xl p-10 text-center space-y-2 my-4">
           <div className="text-amber-500 text-xl font-bold">⚡</div>
-          <p className="text-sm text-gray-500 font-medium">
-            Add at least 2 skills to help teams find you
-          </p>
+          <p className="text-sm text-gray-500 font-medium">Add at least 2 skills to help teams find you</p>
         </div>
       ) : (
         <div className="flex flex-wrap gap-2.5 pt-4">
-          {skills.map((skill, idx) => (
+          {skills.map((skill) => (
             <div
-              key={idx}
+              key={skill.id}
               className="flex items-center gap-2 px-3.5 py-2 bg-blue-50 border border-blue-100 rounded-xl text-xs font-semibold text-blue-700"
             >
               <span>{skill.name}</span>
-              <span className="text-blue-400 font-normal">({skill.level})</span>
-              <button
-                type="button"
-                onClick={() => removeSkill(idx)}
-                className="hover:text-red-500 ml-1"
-              >
+              <span className="text-blue-400 font-normal">({levelLabel(skill.level)})</span>
+              <button type="button" onClick={() => removeSkill(skill.id)} className="hover:text-red-500 ml-1" aria-label={`Remove ${skill.name}`}>
                 ✕
               </button>
             </div>

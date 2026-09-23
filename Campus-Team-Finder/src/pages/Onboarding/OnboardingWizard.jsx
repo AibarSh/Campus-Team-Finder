@@ -22,7 +22,6 @@ export default function OnboardingWizard() {
     firstName: '',
     lastName: '',
     bio: '',
-    photoPreview: null,
     faculty: '',
     studyYear: '',
     skills: [],
@@ -68,36 +67,27 @@ export default function OnboardingWizard() {
     try {
       // 1. Partial profile update (Steps 1, 2, 5)
       await profileApi.updateProfile({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        bio: formData.bio,
-        faculty: formData.faculty,
-        studyYear: formData.studyYear,
-        availability: formData.availability,
-        githubUrl: formData.links?.github,
-        linkedinUrl: formData.links?.linkedin,
-        telegramUrl: formData.links?.telegram,
+        firstName: formData.firstName || null,
+        lastName: formData.lastName || null,
+        bio: formData.bio || null,
+        faculty: formData.faculty || null,
+        studyYear: formData.studyYear || null,
+        availability: formData.availability || null,
+        githubUrl: formData.links?.github || null,
+        linkedinUrl: formData.links?.linkedin || null,
+        telegramHandle: formData.links?.telegram || null,
       });
 
       // 2. Skill set replacement (Step 3)
-      if (formData.skills?.length > 0) {
-        await profileApi.updateSkills(
-          formData.skills.map((s) => ({
-            skillId: s.id || s.name,
-            proficiency: s.level || 'Intermediate',
-          }))
-        );
-      }
+      await profileApi.updateSkills(
+        formData.skills.map((s) => ({ skillId: s.id, proficiency: s.level }))
+      );
 
       // 3. Interest set replacement (Step 4)
-      if (formData.interests?.length > 0) {
-        await profileApi.updateInterests(formData.interests);
-      }
+      await profileApi.updateInterests(formData.interests);
 
       // 4. Preferred roles replacement (Step 4)
-      if (formData.roles?.length > 0) {
-        await profileApi.updatePreferredRoles(formData.roles);
-      }
+      await profileApi.updatePreferredRoles(formData.roles);
 
       // 5. Mark profile complete flag on backend
       await profileApi.completeProfile();
