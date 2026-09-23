@@ -7,6 +7,7 @@ const {
   listMyTeams,
   listTeams,
   getTeam,
+  applyToRole,
 } = require('../controllers/teamsController');
 
 const router = express.Router();
@@ -15,6 +16,7 @@ router.post('/', authRequired, profileRequired, createTeam);
 router.get('/', authRequired, profileRequired, listTeams);
 router.get('/mine', authRequired, listMyTeams);
 router.get('/:id', authRequired, profileRequired, getTeam);
+router.post('/:id/roles/:roleId/apply', authRequired, profileRequired, applyToRole);
 router.put('/:id/roles', authRequired, profileRequired, setOpenRoles);
 router.post('/:id/publish', authRequired, profileRequired, publishTeam);
 

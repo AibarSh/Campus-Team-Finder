@@ -107,6 +107,29 @@ async function getTeam(req, res, next) {
   }
 }
 
+async function applyToRole(req, res, next) {
+  try {
+    const teamOpenRole = await prisma.teamOpenRole.findFirst({
+      where: { id: req.params.roleId, teamId: req.params.id },
+    });
+    if (!teamOpenRole) throw new AppError(404, 'Role not found on this team');
+
+    const application = await prisma.application.create({
+      data: {
+        teamId: req.params.id,
+        teamOpenRoleId: teamOpenRole.id,
+        userId: req.user.id,
+        direction: 'APPLICATION',
+        status: 'SENT',
+      },
+    });
+    res.status(201).json(application);
+  } catch (err) {
+    if (err.code === 'P2002') return next(new AppError(409, 'You already applied to this role'));
+    next(err);
+  }
+}
+
 module.exports = {
   requireTeamOwner,
   createTeam,
@@ -115,4 +138,5 @@ module.exports = {
   listMyTeams,
   listTeams,
   getTeam,
+  applyToRole,
 };
