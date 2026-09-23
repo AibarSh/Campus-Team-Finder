@@ -40,6 +40,25 @@ async function loginWithGoogle(req, res, next) {
   }
 }
 
+async function devLogin(req, res, next) {
+  try {
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!email) throw new AppError(400, 'email is required');
+    if (!email.endsWith('@kbtu.kz')) throw new AppError(403, 'Use your KBTU email to sign in');
+
+    const googleId = `dev:${email}`;
+    const existing = await prisma.user.findUnique({ where: { googleId } });
+    const user =
+      existing ||
+      (await prisma.user.create({ data: { googleId, email, name: email.split('@')[0] } }));
+
+    res.cookie('session', signSessionToken(user.id), SESSION_COOKIE_OPTIONS);
+    res.json({ user, isNewUser: !existing });
+  } catch (err) {
+    next(err);
+  }
+}
+
 function me(req, res) {
   res.json({ user: req.user });
 }
@@ -49,4 +68,4 @@ function logout(req, res) {
   res.json({ ok: true });
 }
 
-module.exports = { loginWithGoogle, me, logout };
+module.exports = { loginWithGoogle, devLogin, me, logout };
