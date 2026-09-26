@@ -1,5 +1,5 @@
-import { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useContext, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import Step1_PersonalInfo from './Step1_PersonalInfo';
 import Step2_AcademicInfo from './Step2_AcademicInfo';
 import Step3_Skills from './Step3_Skills';
@@ -7,6 +7,7 @@ import Step4_Interests from './Step4_Interests';
 import Step5_Availability from './Step5_Availability';
 import { profileApi } from '../../services/api';
 import { UserContext } from '../../context/UserContext';
+import { profileToFormData } from '../../lib/profileForm';
 
 const STEPS = [
   { id: 1, title: 'Personal Info', description: 'Tell us a bit about yourself so teammates can get to know you.' },
@@ -16,7 +17,9 @@ const STEPS = [
   { id: 5, title: 'Availability & Links', description: 'Let teams know your weekly hours and where to find your work.' },
 ];
 
-export default function OnboardingWizard() {
+export default function OnboardingWizard({ mode = 'create' }) {
+  const isEdit = mode === 'edit';
+  const [loadingProfile, setLoadingProfile] = useState(isEdit);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -35,6 +38,16 @@ export default function OnboardingWizard() {
 
   const { refreshUser } = useContext(UserContext);
   const navigate = useNavigate();
+
+  // Step components read their initial state once on mount, so render them only after this loads
+  useEffect(() => {
+    if (!isEdit) return;
+    profileApi
+      .getProfile()
+      .then((profile) => setFormData(profileToFormData(profile)))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoadingProfile(false));
+  }, [isEdit]);
 
   // Helper to merge data from step components
   const updateFormData = (newData) => {
@@ -89,12 +102,12 @@ export default function OnboardingWizard() {
       // 4. Preferred roles replacement (Step 4)
       await profileApi.updatePreferredRoles(formData.roles);
 
-      // 5. Mark profile complete flag on backend
-      await profileApi.completeProfile();
+      // 5. Mark profile complete flag on backend (first-time setup only)
+      if (!isEdit) await profileApi.completeProfile();
 
-      // 6. Refresh user session and enter Dashboard
+      // 6. Refresh user session and leave the wizard
       await refreshUser();
-      navigate('/dashboard');
+      navigate(isEdit ? '/profile' : '/dashboard');
     } catch (err) {
       setError(err.message || 'Failed to submit profile. Please try again.');
     } finally {
@@ -140,12 +153,19 @@ export default function OnboardingWizard() {
             </div>
             <div>
               <h1 className="text-lg font-extrabold text-gray-900">KBTU Connect</h1>
-              <p className="text-xs text-gray-400">Profile Setup</p>
+              <p className="text-xs text-gray-400">{isEdit ? 'Edit Profile' : 'Profile Setup'}</p>
             </div>
           </div>
-          <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl">
-            Step {currentStep} of {STEPS.length}
-          </span>
+          <div className="flex items-center gap-3">
+            {isEdit && (
+              <Link to="/profile" className="text-xs font-semibold text-gray-500 hover:text-gray-700">
+                Cancel
+              </Link>
+            )}
+            <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl">
+              Step {currentStep} of {STEPS.length}
+            </span>
+          </div>
         </div>
 
         {/* Step Progress Bar */}
@@ -189,7 +209,15 @@ export default function OnboardingWizard() {
           )}
 
           {/* Active Step Content */}
-          <div className="pt-2">{renderStepContent()}</div>
+          <div className="pt-2">
+            {loadingProfile ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+              </div>
+            ) : (
+              renderStepContent()
+            )}
+          </div>
 
           {/* Bottom Action Bar */}
           <div className="flex items-center justify-between pt-6 border-t border-gray-100">
@@ -210,6 +238,7 @@ export default function OnboardingWizard() {
               <button
                 type="button"
                 onClick={handleNext}
+                disabled={loadingProfile}
                 className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm"
               >
                 Next →
@@ -218,7 +247,7 @@ export default function OnboardingWizard() {
               <button
                 type="button"
                 onClick={handleComplete}
-                disabled={submitting}
+                disabled={submitting || loadingProfile}
                 className="px-8 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm flex items-center gap-2"
               >
                 {submitting ? (
@@ -227,7 +256,7 @@ export default function OnboardingWizard() {
                     Saving...
                   </>
                 ) : (
-                  'Complete Profile'
+                  isEdit ? 'Save changes' : 'Complete Profile'
                 )}
               </button>
             )}

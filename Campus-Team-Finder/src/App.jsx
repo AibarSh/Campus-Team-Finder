@@ -11,6 +11,7 @@ import MyTeamsPage from './pages/MyTeamsPage';
 import ManageTeamPage from './pages/ManageTeamPage';
 import CreateTeamWizard from './pages/CreateTeamWizard';
 import OnboardingWizard from './pages/Onboarding/OnboardingWizard';
+import ProfilePage from './pages/ProfilePage';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children, requireProfile = true }) {
@@ -62,6 +63,15 @@ export default function App() {
       <Route path="/applications" element={withLayout(<MyApplicationsPage />)} />
       <Route path="/my-teams" element={withLayout(<MyTeamsPage />)} />
       <Route path="/teams/:id/manage" element={withLayout(<ManageTeamPage />)} />
+      <Route path="/profile" element={withLayout(<ProfilePage />)} />
+      <Route
+        path="/profile/edit"
+        element={
+          <ProtectedRoute>
+            <OnboardingWizard mode="edit" />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
