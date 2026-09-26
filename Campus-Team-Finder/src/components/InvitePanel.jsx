@@ -11,16 +11,23 @@ export default function InvitePanel({ team, onInvited }) {
   const [rowErrors, setRowErrors] = useState({});
 
   useEffect(() => {
+    let cancelled = false;
     const handle = setTimeout(() => {
       userApi
         .search(query)
         .then((users) => {
+          if (cancelled) return;
           setResults(users);
           setSearchError('');
         })
-        .catch((err) => setSearchError(err.message));
+        .catch((err) => {
+          if (!cancelled) setSearchError(err.message);
+        });
     }, 300);
-    return () => clearTimeout(handle);
+    return () => {
+      clearTimeout(handle);
+      cancelled = true;
+    };
   }, [query]);
 
   if (team.openRoles.length === 0) {
