@@ -8,6 +8,7 @@ const lookupsRoutes = require('./routes/lookups');
 const profileRoutes = require('./routes/profile');
 const teamsRoutes = require('./routes/teams');
 const applicationsRoutes = require('./routes/applications');
+const usersRoutes = require('./routes/users');
 
 function createApp() {
   const app = express();
@@ -27,6 +28,7 @@ function createApp() {
   app.use('/api/profile', profileRoutes);
   app.use('/api/teams', teamsRoutes);
   app.use('/api/applications', applicationsRoutes);
+  app.use('/api/users', usersRoutes);
 
   app.use(errorHandler);
 
