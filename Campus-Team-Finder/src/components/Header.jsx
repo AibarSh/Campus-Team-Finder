@@ -1,11 +1,19 @@
 import { useState, useContext } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import kbtuLogo from '../assets/kbtu_connect_logo.svg';
 import { UserContext } from '../context/UserContext';
 import { initials } from '../lib/names';
 
 function Header({ showProgress = false, progressStep = 0 }) {
-  const { user } = useContext(UserContext);
+  const { user, logout } = useContext(UserContext);
   const [profileOpen, setProfileOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    setProfileOpen(false);
+    await logout();
+    navigate('/login');
+  };
 
   // Define progress steps from the design (image_1 to image_5)
   const totalOnboardingSteps = 5;
@@ -37,7 +45,24 @@ function Header({ showProgress = false, progressStep = 0 }) {
               >
                 {initials(user)}
               </button>
-              {profileOpen && <div className="absolute right-0 top-12 p-4 bg-white shadow-xl border rounded-lg w-48">Profile Menu</div>}
+              {profileOpen && (
+                <div className="absolute right-0 top-12 py-2 bg-white shadow-xl border border-gray-100 rounded-2xl w-48">
+                  <Link
+                    to="/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Profile
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </>
         ) : null}

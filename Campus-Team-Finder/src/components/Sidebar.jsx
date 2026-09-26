@@ -2,9 +2,11 @@ import { NavLink } from 'react-router-dom';
 
 const sidebarItems = [
   { path: '/dashboard', label: 'Dashboard', icon: 'home' },
-  { path: '/browse', label: 'Browse Teams', icon: 'users' },
-  { path: '/applications', label: 'My Applications', icon: 'file-text' },
-  // ... and others from image_6.png left panel
+  { path: '/browse', label: 'Browse Teams', icon: 'search' },
+  { path: '/applications', label: 'My Applications', icon: 'document' },
+  { path: '/my-teams', label: 'My Teams', icon: 'users' },
+  { path: '/teams/new', label: 'Create Team', icon: 'add' },
+  { path: '/profile', label: 'Profile', icon: 'user' },
 ];
 
 function Sidebar() {
@@ -15,6 +17,7 @@ function Sidebar() {
           <NavLink
             key={item.path}
             to={item.path}
+            end
             className={({ isActive }) =>
               `flex items-center gap-3 p-3 rounded-lg text-lg font-medium transition ${
                 isActive ? 'bg-blue-100 text-blue-700' : 'text-gray-700 hover:bg-gray-100'
@@ -26,7 +29,6 @@ function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      {/* Settings at the bottom */}
     </aside>
   );
 }

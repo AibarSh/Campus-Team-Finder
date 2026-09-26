@@ -32,11 +32,16 @@ function ProtectedRoute({ children, requireProfile = true }) {
   return children;
 }
 
+const withLayout = (element) => (
+  <ProtectedRoute>
+    <Layout>{element}</Layout>
+  </ProtectedRoute>
+);
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-
       <Route
         path="/onboarding"
         element={
@@ -45,29 +50,8 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute requireProfile={true}>
-            <Layout>
-              <DashboardPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/teams"
-        element={
-          <ProtectedRoute requireProfile={true}>
-            <Layout>
-              <BrowseTeamsPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
-
+      <Route path="/dashboard" element={withLayout(<DashboardPage />)} />
+      <Route path="/browse" element={withLayout(<BrowseTeamsPage />)} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

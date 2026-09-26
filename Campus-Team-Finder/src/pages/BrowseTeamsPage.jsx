@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { lookupApi, teamApi } from '../services/api';
 import TeamCard from '../components/TeamCard';
 
 export default function BrowseTeamsPage() {
   const [teams, setTeams] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [role, setRole] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const role = searchParams.get('role') || '';
+  const setRole = (value) => setSearchParams(value ? { role: value } : {});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -39,6 +42,7 @@ export default function BrowseTeamsPage() {
           className="px-4 py-2 rounded-xl border border-gray-200 text-sm bg-white text-gray-700 cursor-pointer"
         >
           <option value="">All roles</option>
+          {role && !roles.some((r) => r.name === role) && <option value={role}>“{role}”</option>}
           {roles.map((r) => (
             <option key={r.id} value={r.name}>{r.name}</option>
           ))}

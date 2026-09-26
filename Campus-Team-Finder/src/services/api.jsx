@@ -109,7 +109,8 @@ export const teamApi = {
       method: 'POST',
     }),
 
-  getMyApplications: () => apiFetch('/api/applications/mine'),
+  getMyApplications: (direction) =>
+    apiFetch(`/api/applications/mine${direction === 'INVITATION' ? '?direction=INVITATION' : ''}`),
 };
 
 // Flow 4 — Create & Manage Team API
@@ -123,7 +124,7 @@ export const teamManagementApi = {
   setOpenRoles: (teamId, roles) =>
     apiFetch(`/api/teams/${teamId}/roles`, {
       method: 'PUT',
-      body: JSON.stringify(roles), // [{ roleId, slotsTotal }]
+      body: JSON.stringify({ roles }), // [{ roleId, slotsTotal }]
     }),
 
   publishTeam: (teamId) =>
@@ -131,7 +132,8 @@ export const teamManagementApi = {
       method: 'POST',
     }),
 
-  getTeamApplications: (teamId) => apiFetch(`/api/teams/${teamId}/applications`),
+  getTeamApplications: (teamId, direction) =>
+    apiFetch(`/api/teams/${teamId}/applications${direction === 'INVITATION' ? '?direction=INVITATION' : ''}`),
 
   inviteUser: (teamId, userId, teamOpenRoleId) =>
     apiFetch(`/api/teams/${teamId}/invite`, {
@@ -146,4 +148,9 @@ export const teamManagementApi = {
     }),
 
   getMyCreatedTeams: () => apiFetch('/api/teams/mine'),
+};
+
+// Flow 4.5B — find users to invite
+export const userApi = {
+  search: (q) => apiFetch(`/api/users?q=${encodeURIComponent(q)}`),
 };

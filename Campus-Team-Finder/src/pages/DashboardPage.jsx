@@ -1,4 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { teamApi } from '../services/api';
 import StatCard from '../components/StatCard';
@@ -10,6 +11,14 @@ export default function DashboardPage() {
   const [teams, setTeams] = useState([]);
   const [applications, setApplications] = useState([]);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const [query, setQuery] = useState('');
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const q = query.trim();
+    navigate(q ? `/browse?role=${encodeURIComponent(q)}` : '/browse');
+  };
 
   useEffect(() => {
     Promise.all([teamApi.getTeams(), teamApi.getMyApplications()])
@@ -38,13 +47,22 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="relative">
+            <form onSubmit={handleSearch}>
               <input
                 type="text"
-                placeholder="Search teams, skills, events..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search teams by role..."
+                aria-label="Search teams by role"
                 className="w-72 px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 bg-white"
               />
-            </div>
+            </form>
+            <Link
+              to="/teams/new"
+              className="px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition shadow-sm"
+            >
+              + Create Team
+            </Link>
           </div>
         </div>
 

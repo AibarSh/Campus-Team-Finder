@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { displayName } from '../lib/names';
 
 export default function TeamCard({ team }) {
@@ -31,13 +32,12 @@ export default function TeamCard({ team }) {
         <p className="text-xs text-gray-400">
           Created by <span className="font-semibold text-gray-700">{displayName(team.creator)}</span>
         </p>
-        <button
-          disabled
-          title="Team details coming soon"
-          className="w-full py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl opacity-50 cursor-not-allowed"
+        <Link
+          to={`/teams/${team.id}`}
+          className="block text-center w-full py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition"
         >
           View Team
-        </button>
+        </Link>
       </div>
     </div>
   );
