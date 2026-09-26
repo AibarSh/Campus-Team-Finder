@@ -136,7 +136,11 @@ export default function ManageTeamPage() {
       {tab === 'INVITATION' && (
         <section className="space-y-3">
           <h2 className="text-sm font-bold text-gray-900">Invite students</h2>
-          <InvitePanel team={team} onInvited={(invitation) => setItems((prev) => [invitation, ...(prev || [])])} />
+          {team.status === 'DRAFT' ? (
+            <p className="text-sm text-gray-500">Publish the team before inviting people.</p>
+          ) : (
+            <InvitePanel team={team} onInvited={(invitation) => setItems((prev) => [invitation, ...(prev || [])])} />
+          )}
         </section>
       )}
 
