@@ -154,6 +154,12 @@ async function listTeamApplications(req, res, next) {
   try {
     await requireTeamOwner(req.params.id, req.user.id);
     const direction = req.query.direction === 'INVITATION' ? 'INVITATION' : 'APPLICATION';
+    if (direction === 'APPLICATION') {
+      await prisma.application.updateMany({
+        where: { teamId: req.params.id, direction, status: 'SENT' },
+        data: { status: 'VIEWED' },
+      });
+    }
     const applications = await prisma.application.findMany({
       where: { teamId: req.params.id, direction },
       include: { user: true, teamOpenRole: { include: { role: true } } },

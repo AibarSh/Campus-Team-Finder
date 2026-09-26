@@ -65,3 +65,38 @@ test('a non-creator cannot invite users to the team', async () => {
     .send({ userId: applicant.id, teamOpenRoleId: teamOpenRole.id });
   expect(res.status).toBe(403);
 });
+
+test('owner listing applications marks SENT ones VIEWED and leaves the rest alone', async () => {
+  const other = await prisma.user.create({
+    data: { email: 'other@kbtu.kz', googleId: 'g-other', name: 'Other', profileComplete: true },
+  });
+  const invitee = await prisma.user.create({
+    data: { email: 'invitee@kbtu.kz', googleId: 'g-invitee', name: 'Invitee', profileComplete: true },
+  });
+  await prisma.application.createMany({
+    data: [
+      { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: applicant.id, direction: 'APPLICATION', status: 'SENT' },
+      { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: other.id, direction: 'APPLICATION', status: 'DECLINED' },
+      { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: invitee.id, direction: 'INVITATION', status: 'SENT' },
+    ],
+  });
+
+  const res = await request(createApp()).get(`/api/teams/${team.id}/applications`).set('Cookie', [ownerCookie]);
+  expect(res.status).toBe(200);
+  const statusByEmail = Object.fromEntries(res.body.map((a) => [a.user.email, a.status]));
+  expect(statusByEmail).toEqual({ 'applicant@kbtu.kz': 'VIEWED', 'other@kbtu.kz': 'DECLINED' });
+
+  const invitation = await prisma.application.findFirst({ where: { direction: 'INVITATION' } });
+  expect(invitation.status).toBe('SENT');
+});
+
+test('a non-creator request does not mark anything VIEWED', async () => {
+  await prisma.application.create({
+    data: { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: applicant.id, direction: 'APPLICATION' },
+  });
+  const applicantCookie = `session=${signSessionToken(applicant.id)}`;
+  await request(createApp()).get(`/api/teams/${team.id}/applications`).set('Cookie', [applicantCookie]);
+
+  const application = await prisma.application.findFirst();
+  expect(application.status).toBe('SENT');
+});
