@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import BrowseTeamsPage from './pages/BrowseTeamsPage';
 import TeamDetailsPage from './pages/TeamDetailsPage';
+import MyApplicationsPage from './pages/MyApplicationsPage';
 import OnboardingWizard from './pages/Onboarding/OnboardingWizard';
 import Layout from './components/Layout';
 
@@ -54,6 +55,7 @@ export default function App() {
       <Route path="/dashboard" element={withLayout(<DashboardPage />)} />
       <Route path="/browse" element={withLayout(<BrowseTeamsPage />)} />
       <Route path="/teams/:id" element={withLayout(<TeamDetailsPage />)} />
+      <Route path="/applications" element={withLayout(<MyApplicationsPage />)} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
