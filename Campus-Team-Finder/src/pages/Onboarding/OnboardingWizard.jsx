@@ -36,6 +36,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const { refreshUser } = useContext(UserContext);
   const navigate = useNavigate();
@@ -46,7 +47,10 @@ export default function OnboardingWizard({ mode = 'create' }) {
     profileApi
       .getProfile()
       .then((profile) => setFormData(profileToFormData(profile)))
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        setError(err.message);
+        setLoadFailed(true);
+      })
       .finally(() => setLoadingProfile(false));
   }, [isEdit]);
 
@@ -203,7 +207,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
           </div>
 
           {/* Error Message Alert */}
-          {error && (
+          {error && !loadFailed && (
             <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">
               {error}
             </div>
@@ -211,7 +215,20 @@ export default function OnboardingWizard({ mode = 'create' }) {
 
           {/* Active Step Content */}
           <div className="pt-2">
-            {loadingProfile ? <Spinner /> : renderStepContent()}
+            {loadFailed ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">
+                  {error}
+                </div>
+                <Link to="/profile" className="text-xs font-semibold text-gray-500 hover:text-gray-700">
+                  Cancel
+                </Link>
+              </div>
+            ) : loadingProfile ? (
+              <Spinner />
+            ) : (
+              renderStepContent()
+            )}
           </div>
 
           {/* Bottom Action Bar */}
@@ -233,7 +250,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
               <button
                 type="button"
                 onClick={handleNext}
-                disabled={loadingProfile}
+                disabled={loadingProfile || loadFailed}
                 className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm"
               >
                 Next →
@@ -242,7 +259,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
               <button
                 type="button"
                 onClick={handleComplete}
-                disabled={submitting || loadingProfile}
+                disabled={submitting || loadingProfile || loadFailed}
                 className="px-8 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm flex items-center gap-2"
               >
                 {submitting ? (
