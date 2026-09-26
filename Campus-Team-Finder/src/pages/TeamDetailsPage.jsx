@@ -11,15 +11,17 @@ export default function TeamDetailsPage() {
   const { user } = useContext(UserContext);
   const [team, setTeam] = useState(null);
   const [myApplications, setMyApplications] = useState([]);
+  const [myInvitations, setMyInvitations] = useState([]);
   const [error, setError] = useState('');
   const [busyRoleId, setBusyRoleId] = useState(null);
   const [roleErrors, setRoleErrors] = useState({});
 
   useEffect(() => {
-    Promise.all([teamApi.getTeamById(id), teamApi.getMyApplications()])
-      .then(([t, a]) => {
+    Promise.all([teamApi.getTeamById(id), teamApi.getMyApplications(), teamApi.getMyApplications('INVITATION')])
+      .then(([t, a, i]) => {
         setTeam(t);
         setMyApplications(a);
+        setMyInvitations(i);
       })
       .catch((err) => setError(err.message));
   }, [id]);
@@ -47,7 +49,14 @@ export default function TeamDetailsPage() {
   if (!team) return <Spinner />;
 
   const isOwner = team.creatorId === user.id;
-  const statusFor = (openRoleId) => myApplications.find((a) => a.teamOpenRoleId === openRoleId)?.status;
+  const entryFor = (openRoleId) => {
+    const matches = [...myApplications, ...myInvitations].filter((a) => a.teamOpenRoleId === openRoleId);
+    return (
+      matches.find((a) => a.status === 'ACCEPTED') ||
+      matches.find((a) => a.status === 'SENT' || a.status === 'VIEWED') ||
+      matches.find((a) => a.status === 'DECLINED')
+    );
+  };
 
   return (
     <main className="p-8 space-y-6 max-w-4xl">
@@ -87,8 +96,14 @@ export default function TeamDetailsPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-bold text-gray-950">Open roles</h2>
         {team.openRoles.length === 0 && <p className="text-sm text-gray-500">This team has no open roles yet.</p>}
+        {!isOwner && team.status !== 'PUBLISHED' && (
+          <p className="text-sm text-gray-500">This team is not accepting applications yet.</p>
+        )}
         {team.openRoles.map((openRole) => {
-          const status = statusFor(openRole.id);
+          const entry = entryFor(openRole.id);
+          const status = entry?.status;
+          const isPendingInvitation =
+            entry?.direction === 'INVITATION' && (status === 'SENT' || status === 'VIEWED');
           const full = openRole.slotsFilled >= openRole.slotsTotal;
           return (
             <div key={openRole.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-2">
@@ -99,21 +114,31 @@ export default function TeamDetailsPage() {
                     {openRole.slotsFilled}/{openRole.slotsTotal} slots filled
                   </p>
                 </div>
-                {!isOwner &&
-                  (status ? (
-                    <StatusBadge status={status} />
-                  ) : full ? (
-                    <span className="px-3 py-1.5 bg-gray-100 text-gray-400 text-xs font-semibold rounded-lg">Full</span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={busyRoleId === openRole.id}
-                      onClick={() => apply(openRole)}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
-                    >
-                      {busyRoleId === openRole.id ? 'Applying...' : 'Apply'}
-                    </button>
-                  ))}
+                {!isOwner && (
+                  <div className="flex flex-col items-end gap-1">
+                    {status ? (
+                      <StatusBadge status={status} />
+                    ) : team.status === 'PUBLISHED' ? (
+                      full ? (
+                        <span className="px-3 py-1.5 bg-gray-100 text-gray-400 text-xs font-semibold rounded-lg">Full</span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busyRoleId === openRole.id}
+                          onClick={() => apply(openRole)}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+                        >
+                          {busyRoleId === openRole.id ? 'Applying...' : 'Apply'}
+                        </button>
+                      )
+                    ) : null}
+                    {isPendingInvitation && (
+                      <Link to="/applications" className="text-xs font-semibold text-blue-600 hover:underline">
+                        Respond in My Applications
+                      </Link>
+                    )}
+                  </div>
+                )}
               </div>
               {roleErrors[openRole.id] && <p className="text-xs text-red-600">{roleErrors[openRole.id]}</p>}
             </div>
