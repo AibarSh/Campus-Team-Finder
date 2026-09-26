@@ -8,6 +8,7 @@ import Step5_Availability from './Step5_Availability';
 import { profileApi } from '../../services/api';
 import { UserContext } from '../../context/UserContext';
 import { profileToFormData } from '../../lib/profileForm';
+import { Spinner } from '../../components/Feedback';
 
 const STEPS = [
   { id: 1, title: 'Personal Info', description: 'Tell us a bit about yourself so teammates can get to know you.' },
@@ -210,13 +211,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
 
           {/* Active Step Content */}
           <div className="pt-2">
-            {loadingProfile ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-              </div>
-            ) : (
-              renderStepContent()
-            )}
+            {loadingProfile ? <Spinner /> : renderStepContent()}
           </div>
 
           {/* Bottom Action Bar */}
