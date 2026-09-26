@@ -12,8 +12,15 @@ const STEPS = [
 const inputClass =
   'w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 bg-white';
 
+// Remounts the wizard whenever the resumed draft id changes (e.g. navigating from
+// /teams/new?team=X to a fresh /teams/new), instead of keeping stale step/state around.
+export function CreateTeamRoute() {
+  const [sp] = useSearchParams();
+  return <CreateTeamWizard key={sp.get('team') || 'new'} />;
+}
+
 export default function CreateTeamWizard() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const resumeId = searchParams.get('team');
   const navigate = useNavigate();
 
@@ -71,6 +78,7 @@ export default function CreateTeamWizard() {
       });
       setTeam({ ...created, openRoles: [] });
       setStep(2);
+      setSearchParams({ team: created.id }, { replace: true });
     });
   };
 

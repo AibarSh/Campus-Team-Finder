@@ -9,7 +9,7 @@ import TeamDetailsPage from './pages/TeamDetailsPage';
 import MyApplicationsPage from './pages/MyApplicationsPage';
 import MyTeamsPage from './pages/MyTeamsPage';
 import ManageTeamPage from './pages/ManageTeamPage';
-import CreateTeamWizard from './pages/CreateTeamWizard';
+import { CreateTeamRoute } from './pages/CreateTeamWizard';
 import OnboardingWizard from './pages/Onboarding/OnboardingWizard';
 import ProfilePage from './pages/ProfilePage';
 import Layout from './components/Layout';
@@ -58,7 +58,7 @@ export default function App() {
       />
       <Route path="/dashboard" element={withLayout(<DashboardPage />)} />
       <Route path="/browse" element={withLayout(<BrowseTeamsPage />)} />
-      <Route path="/teams/new" element={withLayout(<CreateTeamWizard />)} />
+      <Route path="/teams/new" element={withLayout(<CreateTeamRoute />)} />
       <Route path="/teams/:id" element={withLayout(<TeamDetailsPage />)} />
       <Route path="/applications" element={withLayout(<MyApplicationsPage />)} />
       <Route path="/my-teams" element={withLayout(<MyTeamsPage />)} />
