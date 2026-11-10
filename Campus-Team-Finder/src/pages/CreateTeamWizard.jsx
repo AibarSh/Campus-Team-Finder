@@ -3,14 +3,19 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { lookupApi, teamApi, teamManagementApi } from '../services/api';
 import { ErrorBox, Spinner } from '../components/Feedback';
 
+const heading = { fontFamily: 'Outfit, sans-serif' };
+
 const STEPS = [
   { id: 1, title: 'Project Info', description: 'Name your team and the event or hackathon you are building for.' },
   { id: 2, title: 'Open Roles', description: 'Specify the roles you need and how many people for each.' },
   { id: 3, title: 'Review & Publish', description: 'Check everything, then publish to make your team visible to students.' },
 ];
 
-const inputClass =
-  'w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 bg-white';
+const fieldClass =
+  'w-full px-4 rounded-xl border border-slate-200 text-slate-900 text-sm placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white';
+const inputClass = `${fieldClass} h-10`;
+const textareaClass = `${fieldClass} py-3 min-h-28 resize-none`;
+const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5';
 
 // Remounts the wizard whenever the resumed draft id changes (e.g. navigating from
 // /teams/new?team=X to a fresh /teams/new), instead of keeping stale step/state around.
@@ -106,72 +111,103 @@ export default function CreateTeamWizard() {
   const waitingForDraft = step > 1 && !team;
 
   return (
-    <main className="p-8">
-      <div className="max-w-3xl mx-auto space-y-8">
-        <div className="space-y-2">
-          <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-blue-600 h-full rounded-full transition-all duration-300"
-              style={{ width: `${(step / STEPS.length) * 100}%` }}
-            />
+    <main className="min-h-[calc(100vh-65px)] bg-slate-50 px-6 py-10">
+      <div className="max-w-2xl mx-auto">
+        {/* Progress */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-slate-800 font-semibold text-sm" style={heading}>
+              Create team
+            </span>
+            <span className="text-xs text-slate-400 font-medium">
+              Step {step} of {STEPS.length}
+            </span>
           </div>
-          <div className="flex justify-between text-[11px] text-gray-400 font-medium px-0.5">
+          <div className="flex items-center gap-2">
             {STEPS.map((s) => (
-              <span key={s.id} className={s.id <= step ? 'text-blue-600 font-bold' : ''}>
-                {s.id}. {s.title}
-              </span>
+              <div
+                key={s.id}
+                className="flex-1 h-1.5 rounded-full transition-all duration-500"
+                style={{ background: s.id < step ? '#2563eb' : s.id === step ? '#93c5fd' : '#e2e8f0' }}
+              />
             ))}
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
-          <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900">{meta.title}</h1>
-            <p className="text-xs sm:text-sm text-gray-500">{meta.description}</p>
+        {/* Step label */}
+        <div className="mb-7">
+          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+            {meta.description}
           </div>
+          <h1 className="text-slate-900 text-2xl font-bold" style={heading}>
+            {meta.title}
+          </h1>
+        </div>
 
+        {/* Card */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 space-y-6">
           <ErrorBox message={error} />
-
           {waitingForDraft && !error && <Spinner />}
 
           {step === 1 && (
-            <div className="space-y-4">
-              <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-gray-600">Team name *</span>
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="teamName" className={labelClass}>
+                  Team name <span className="text-red-500">*</span>
+                </label>
                 <input
+                  id="teamName"
                   className={inputClass}
                   value={info.name}
                   onChange={(e) => setInfo({ ...info, name: e.target.value })}
                   placeholder="e.g. AI Study Buddy"
                 />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-gray-600">Event / hackathon</span>
+              </div>
+              <div>
+                <label htmlFor="teamEvent" className={labelClass}>
+                  Event / hackathon
+                </label>
                 <input
+                  id="teamEvent"
                   className={inputClass}
                   value={info.eventTarget}
                   onChange={(e) => setInfo({ ...info, eventTarget: e.target.value })}
                   placeholder="e.g. KBTU Hackathon 2026"
                 />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-gray-600">Description</span>
+              </div>
+              <div>
+                <label htmlFor="teamDescription" className={labelClass}>
+                  Description
+                </label>
                 <textarea
-                  className={`${inputClass} min-h-28`}
+                  id="teamDescription"
+                  className={textareaClass}
                   value={info.description}
                   onChange={(e) => setInfo({ ...info, description: e.target.value })}
                   placeholder="What are you building and who are you looking for?"
                 />
-              </label>
+              </div>
             </div>
           )}
 
           {step === 2 && team && (
             <div className="space-y-3">
+              <div className="flex items-center gap-3 text-xs font-medium text-slate-400">
+                <span className="flex-1">Role</span>
+                <span className="w-24">Slots</span>
+                <span className="w-8" />
+              </div>
               {rows.map((row, index) => (
                 <div key={index} className="flex items-center gap-3">
                   <select
-                    className={inputClass}
+                    className={`${inputClass} flex-1`}
                     value={row.roleId}
                     onChange={(e) => updateRow(index, { roleId: e.target.value })}
                     aria-label="Role"
@@ -195,17 +231,19 @@ export default function CreateTeamWizard() {
                     type="button"
                     onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
                     disabled={rows.length === 1}
-                    className="px-3 py-2 text-sm text-gray-400 hover:text-red-600 disabled:opacity-30"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:hover:text-slate-300 disabled:hover:bg-transparent"
                     aria-label="Remove role"
                   >
-                    ✕
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
               ))}
               <button
                 type="button"
                 onClick={() => setRows((prev) => [...prev, { roleId: '', slotsTotal: 1 }])}
-                className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+                className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
               >
                 + Add role
               </button>
@@ -213,18 +251,28 @@ export default function CreateTeamWizard() {
           )}
 
           {step === 3 && team && (
-            <div className="space-y-4 text-sm">
+            <div className="space-y-5 text-sm">
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Team</p>
-                <p className="font-bold text-gray-900">{team.name}</p>
-                {team.eventTarget && <p className="text-gray-500">{team.eventTarget}</p>}
+                <p className="text-xs font-medium text-slate-400 mb-1">Team</p>
+                <p className="text-slate-900 font-bold text-lg" style={heading}>
+                  {team.name}
+                </p>
+                {team.eventTarget && <p className="text-slate-500">{team.eventTarget}</p>}
               </div>
-              {team.description && <p className="text-gray-600">{team.description}</p>}
+              {team.description && (
+                <div>
+                  <p className="text-xs font-medium text-slate-400 mb-1">Description</p>
+                  <p className="text-slate-600 leading-relaxed">{team.description}</p>
+                </div>
+              )}
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Open roles</p>
+                <p className="text-xs font-medium text-slate-400 mb-2">Open roles</p>
                 <div className="flex flex-wrap gap-1.5">
                   {team.openRoles.map((r) => (
-                    <span key={r.id} className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-600 text-xs rounded-lg">
+                    <span
+                      key={r.id}
+                      className="text-xs px-3 py-1 bg-blue-50 text-blue-700 rounded-full font-medium"
+                    >
                       {r.role.name} · {r.slotsTotal} {r.slotsTotal === 1 ? 'slot' : 'slots'}
                     </span>
                   ))}
@@ -232,41 +280,59 @@ export default function CreateTeamWizard() {
               </div>
             </div>
           )}
+        </div>
 
-          <div className="flex items-center justify-between pt-6 border-t border-gray-100">
-            {step === 3 ? (
+        {/* Nav buttons */}
+        <div className="flex items-center justify-between mt-6">
+          {step === 3 ? (
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              disabled={busy}
+              className="px-6 py-2.5 border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-40 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+              </svg>
+              Back
+            </button>
+          ) : (
+            <span />
+          )}
+
+          <div className="flex items-center gap-3">
+            {step === 3 && (
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                onClick={() => navigate('/my-teams')}
                 disabled={busy}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 transition"
+                className="px-6 py-2.5 border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-40"
               >
-                ← Back
+                Save as draft
               </button>
-            ) : (
-              <span />
             )}
-
-            <div className="flex items-center gap-3">
-              {step === 3 && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/my-teams')}
-                  disabled={busy}
-                  className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition"
-                >
-                  Save as draft
-                </button>
+            <button
+              type="button"
+              onClick={step === 1 ? saveInfo : step === 2 ? saveRoles : publish}
+              disabled={busy || waitingForDraft}
+              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200 flex items-center gap-2 disabled:opacity-50"
+            >
+              {busy ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : step === 3 ? (
+                'Publish team'
+              ) : (
+                <>
+                  Continue
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </>
               )}
-              <button
-                type="button"
-                onClick={step === 1 ? saveInfo : step === 2 ? saveRoles : publish}
-                disabled={busy || waitingForDraft}
-                className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm disabled:opacity-50"
-              >
-                {busy ? 'Saving...' : step === 3 ? 'Publish team' : 'Next →'}
-              </button>
-            </div>
+            </button>
           </div>
         </div>
       </div>

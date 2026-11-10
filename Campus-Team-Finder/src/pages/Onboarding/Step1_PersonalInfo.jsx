@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { initials } from '../../lib/names';
 
+const inputClass =
+  'w-full h-10 px-4 rounded-xl border border-slate-200 text-slate-900 text-sm placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all';
+
 export default function Step1_PersonalInfo({ data = {}, update }) {
   const [firstName, setFirstName] = useState(data.firstName || '');
   const [lastName, setLastName] = useState(data.lastName || '');
@@ -9,72 +12,78 @@ export default function Step1_PersonalInfo({ data = {}, update }) {
   const handleFirstNameChange = (e) => {
     const val = e.target.value;
     setFirstName(val);
-    if (update) update({ ...data, firstName: val, lastName, bio });
+    if (update) update({ firstName: val, lastName, bio });
   };
 
   const handleLastNameChange = (e) => {
     const val = e.target.value;
     setLastName(val);
-    if (update) update({ ...data, firstName, lastName: val, bio });
+    if (update) update({ firstName, lastName: val, bio });
   };
 
   const handleBioChange = (e) => {
-    const val = e.target.value;
-    if (val.length <= 200) {
-      setBio(val);
-      if (update) update({ ...data, firstName, lastName, bio: val });
-    }
+    const val = e.target.value.slice(0, 200);
+    setBio(val);
+    if (update) update({ firstName, lastName, bio: val });
   };
 
   return (
     <div className="space-y-6">
-      {/* Profile Photo Upload Section */}
+      {/* Avatar */}
       <div className="flex items-center gap-6">
-        <div className="w-20 h-20 rounded-2xl bg-blue-100/70 text-blue-600 flex items-center justify-center font-bold text-2xl border border-blue-200 shrink-0">
-          {initials({ firstName, lastName })}
+        <div
+          className="w-20 h-20 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600 text-2xl font-bold select-none flex-shrink-0"
+          style={{ fontFamily: 'Outfit, sans-serif' }}
+        >
+          {initials({ firstName, lastName }) || '?'}
         </div>
-        <p className="text-xs text-gray-400">Your initials are shown to other students.</p>
+        <div>
+          <div className="text-sm font-medium text-slate-700 mb-1">Profile avatar</div>
+          <p className="text-xs text-slate-400">Your initials are shown to other students.</p>
+        </div>
       </div>
 
-      {/* Name Inputs Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-900">First Name</label>
+        <div>
+          <label htmlFor="firstName" className="block text-sm font-medium text-slate-700 mb-1.5">
+            First Name
+          </label>
           <input
-            type="text"
-            placeholder="Aisha"
+            id="firstName"
             value={firstName}
             onChange={handleFirstNameChange}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition"
+            placeholder="Aisha"
+            className={inputClass}
           />
         </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-900">Last Name</label>
+        <div>
+          <label htmlFor="lastName" className="block text-sm font-medium text-slate-700 mb-1.5">
+            Last Name
+          </label>
           <input
-            type="text"
-            placeholder="Bekova"
+            id="lastName"
             value={lastName}
             onChange={handleLastNameChange}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition"
+            placeholder="Bekova"
+            className={inputClass}
           />
         </div>
       </div>
 
-      {/* Short Bio Area */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-900">Short Bio</label>
-        <div className="relative">
-          <textarea
-            rows={4}
-            placeholder="I'm a 3rd-year CS student passionate about AI and building products that matter..."
-            value={bio}
-            onChange={handleBioChange}
-            className="w-full p-4 rounded-2xl border border-gray-200 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition resize-none placeholder-gray-400"
-          />
-          <div className="text-right text-xs text-gray-400 mt-1 font-medium">
-            {bio.length}/200
-          </div>
+      <div>
+        <label htmlFor="bio" className="block text-sm font-medium text-slate-700 mb-1.5">
+          Short Bio
+        </label>
+        <textarea
+          id="bio"
+          value={bio}
+          onChange={handleBioChange}
+          placeholder="I'm a 3rd-year CS student passionate about AI and building products that matter…"
+          rows={3}
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 text-sm placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all resize-none"
+        />
+        <div className="flex justify-end mt-1">
+          <span className="text-xs text-slate-400">{bio.length}/200</span>
         </div>
       </div>
     </div>

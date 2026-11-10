@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Step1_PersonalInfo from './Step1_PersonalInfo';
 import Step2_AcademicInfo from './Step2_AcademicInfo';
@@ -10,18 +10,26 @@ import { UserContext } from '../../context/UserContext';
 import { profileToFormData } from '../../lib/profileForm';
 import { Spinner } from '../../components/Feedback';
 
+const heading = { fontFamily: 'Outfit, sans-serif' };
+
 const STEPS = [
-  { id: 1, title: 'Personal Info', description: 'Tell us a bit about yourself so teammates can get to know you.' },
-  { id: 2, title: 'Academic Info', description: 'Your study details help match you with relevant campus projects.' },
-  { id: 3, title: 'Skills & Expertise', description: 'List your skills along with your proficiency level.' },
-  { id: 4, title: 'Interests & Roles', description: 'Select topics you care about and roles you prefer.' },
-  { id: 5, title: 'Availability & Links', description: 'Let teams know your weekly hours and where to find your work.' },
+  { title: 'Personal Info', desc: 'Tell us about yourself' },
+  { title: 'Academic Info', desc: 'Your university details' },
+  { title: 'Skills', desc: 'What can you build?' },
+  { title: 'Interests & Roles', desc: 'What do you want to work on?' },
+  { title: 'Availability & Links', desc: 'How teams can reach you' },
 ];
+
+function ErrorAlert({ children }) {
+  return (
+    <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">{children}</div>
+  );
+}
 
 export default function OnboardingWizard({ mode = 'create' }) {
   const isEdit = mode === 'edit';
   const [loadingProfile, setLoadingProfile] = useState(isEdit);
-  const [currentStep, setCurrentStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -37,6 +45,8 @@ export default function OnboardingWizard({ mode = 'create' }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [loadFailed, setLoadFailed] = useState(false);
+  const [done, setDone] = useState(false);
+  const redirectTimer = useRef(null);
 
   const { refreshUser } = useContext(UserContext);
   const navigate = useNavigate();
@@ -54,36 +64,25 @@ export default function OnboardingWizard({ mode = 'create' }) {
       .finally(() => setLoadingProfile(false));
   }, [isEdit]);
 
-  // Helper to merge data from step components
-  const updateFormData = (newData) => {
-    setFormData((prev) => ({
-      ...prev,
-      ...newData,
-    }));
-  };
+  useEffect(() => () => clearTimeout(redirectTimer.current), []);
 
-  // Step navigation handlers
+  const updateFormData = (newData) => setFormData((prev) => ({ ...prev, ...newData }));
+
   const handleNext = () => {
     setError('');
-    if (currentStep < STEPS.length) {
-      setCurrentStep((prev) => prev + 1);
-    }
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
   const handleBack = () => {
     setError('');
-    if (currentStep > 1) {
-      setCurrentStep((prev) => prev - 1);
-    }
+    setStep((s) => Math.max(s - 1, 0));
   };
 
-  // Final submit handler — flow 2 integration
   const handleComplete = async () => {
     setSubmitting(true);
     setError('');
 
     try {
-      // 1. Partial profile update (Steps 1, 2, 5)
       await profileApi.updateProfile({
         firstName: formData.firstName || null,
         lastName: formData.lastName || null,
@@ -95,24 +94,19 @@ export default function OnboardingWizard({ mode = 'create' }) {
         linkedinUrl: formData.links?.linkedin || null,
         telegramHandle: formData.links?.telegram || null,
       });
-
-      // 2. Skill set replacement (Step 3)
-      await profileApi.updateSkills(
-        formData.skills.map((s) => ({ skillId: s.id, proficiency: s.level }))
-      );
-
-      // 3. Interest set replacement (Step 4)
+      await profileApi.updateSkills(formData.skills.map((s) => ({ skillId: s.id, proficiency: s.level })));
       await profileApi.updateInterests(formData.interests);
-
-      // 4. Preferred roles replacement (Step 4)
       await profileApi.updatePreferredRoles(formData.roles);
-
-      // 5. Mark profile complete flag on backend (first-time setup only)
       if (!isEdit) await profileApi.completeProfile();
-
-      // 6. Refresh user session and leave the wizard
       await refreshUser();
-      navigate(isEdit ? '/profile' : '/dashboard');
+
+      if (isEdit) {
+        navigate('/profile');
+        return;
+      }
+      // First-time setup: show the success screen, then go to the dashboard
+      setDone(true);
+      redirectTimer.current = setTimeout(() => navigate('/dashboard'), 1600);
     } catch (err) {
       setError(err.message || 'Failed to submit profile. Please try again.');
     } finally {
@@ -120,162 +114,190 @@ export default function OnboardingWizard({ mode = 'create' }) {
     }
   };
 
-  // Switch statement rendering current active step
   const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
+    switch (step) {
+      case 0:
         return <Step1_PersonalInfo data={formData} update={updateFormData} />;
-      case 2:
+      case 1:
         return <Step2_AcademicInfo data={formData} update={updateFormData} />;
+      case 2:
+        return <Step3_Skills data={formData.skills} update={(skills) => updateFormData({ skills })} />;
       case 3:
-        return (
-          <Step3_Skills
-            data={formData.skills}
-            update={(updatedSkills) => updateFormData({ skills: updatedSkills })}
-          />
-        );
-      case 4:
         return <Step4_Interests data={formData} update={updateFormData} />;
-      case 5:
+      case 4:
         return <Step5_Availability data={formData} update={updateFormData} />;
       default:
         return null;
     }
   };
 
-  const activeStepMeta = STEPS[currentStep - 1];
-  const progressPercent = (currentStep / STEPS.length) * 100;
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
-      <div className="max-w-3xl w-full mx-auto space-y-8 my-auto">
-        
-        {/* Top Header & Branding */}
-        <div className="flex items-center justify-between border-b border-gray-200 pb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 text-white rounded-2xl font-black flex items-center justify-center text-lg">
-              K
-            </div>
-            <div>
-              <h1 className="text-lg font-extrabold text-gray-900">KBTU Connect</h1>
-              <p className="text-xs text-gray-400">{isEdit ? 'Edit Profile' : 'Profile Setup'}</p>
-            </div>
+  if (done) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center px-6">
+          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
-          <div className="flex items-center gap-3">
-            {isEdit && (
-              <Link to="/profile" className="text-xs font-semibold text-gray-500 hover:text-gray-700">
-                Cancel
-              </Link>
-            )}
-            <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl">
-              Step {currentStep} of {STEPS.length}
-            </span>
-          </div>
-        </div>
-
-        {/* Step Progress Bar */}
-        <div className="space-y-2">
-          <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
-            <div
-              className="bg-blue-600 h-full rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-[11px] text-gray-400 font-medium px-0.5">
-            {STEPS.map((step) => (
-              <span
-                key={step.id}
-                className={step.id <= currentStep ? 'text-blue-600 font-bold' : ''}
-              >
-                {step.id}. {step.title}
-              </span>
+          <h2 className="text-slate-900 text-2xl font-bold mb-2" style={heading}>
+            Profile Created!
+          </h2>
+          <p className="text-slate-500">Taking you to your dashboard…</p>
+          <div className="mt-6 flex justify-center gap-1">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"
+                style={{ animationDelay: `${i * 0.15}s` }}
+              />
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Step Card Container */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
-          
-          {/* Step Header */}
-          <div className="space-y-1">
-            <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900">
-              {activeStepMeta.title}
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500">
-              {activeStepMeta.description}
-            </p>
-          </div>
+  const isLast = step === STEPS.length - 1;
+  const blocked = loadingProfile || loadFailed;
 
-          {/* Error Message Alert */}
-          {error && !loadFailed && (
-            <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">
-              {error}
+  return (
+    <div className="min-h-screen bg-slate-50">
+      {/* Sticky header with progress */}
+      <header className="bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm" style={heading}>K</span>
+              </div>
+              <span className="text-slate-800 font-semibold text-sm" style={heading}>KBTU Connect</span>
+              {isEdit && <span className="text-xs text-slate-400">· Edit profile</span>}
             </div>
-          )}
-
-          {/* Active Step Content */}
-          <div className="pt-2">
-            {loadFailed ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-xs font-medium">
-                  {error}
-                </div>
-                <Link to="/profile" className="text-xs font-semibold text-gray-500 hover:text-gray-700">
+            <div className="flex items-center gap-4">
+              {isEdit && (
+                <Link to="/profile" className="text-xs font-semibold text-slate-500 hover:text-slate-700">
                   Cancel
                 </Link>
-              </div>
-            ) : loadingProfile ? (
-              <Spinner />
-            ) : (
-              renderStepContent()
-            )}
+              )}
+              <span className="text-xs text-slate-400 font-medium">
+                Step {step + 1} of {STEPS.length}
+              </span>
+            </div>
           </div>
-
-          {/* Bottom Action Bar */}
-          <div className="flex items-center justify-between pt-6 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={handleBack}
-              disabled={currentStep === 1 || submitting}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
-                currentStep === 1 || submitting
-                  ? 'opacity-0 pointer-events-none'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              ← Back
-            </button>
-
-            {currentStep < STEPS.length ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={loadingProfile || loadFailed}
-                className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm"
-              >
-                Next →
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleComplete}
-                disabled={submitting || loadingProfile || loadFailed}
-                className="px-8 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-sm flex items-center gap-2"
-              >
-                {submitting ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  isEdit ? 'Save changes' : 'Complete Profile'
-                )}
-              </button>
-            )}
+          <div className="flex items-center gap-2">
+            {STEPS.map((s, i) => (
+              <div key={s.title} className="flex-1">
+                <div
+                  className="w-full h-1.5 rounded-full transition-all duration-500"
+                  style={{ background: i < step ? '#2563eb' : i === step ? '#93c5fd' : '#e2e8f0' }}
+                />
+              </div>
+            ))}
           </div>
         </div>
+      </header>
 
-      </div>
+      <main className="max-w-2xl mx-auto px-6 py-10">
+        {/* Step label */}
+        <div className="mb-7">
+          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
+            </svg>
+            {STEPS[step].desc}
+          </div>
+          <h1 className="text-slate-900 text-2xl font-bold" style={heading}>
+            {STEPS[step].title}
+          </h1>
+        </div>
+
+        {/* Card */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 space-y-6">
+          {error && !loadFailed && <ErrorAlert>{error}</ErrorAlert>}
+
+          {loadFailed ? (
+            <div className="space-y-4">
+              <ErrorAlert>{error}</ErrorAlert>
+              <Link to="/profile" className="text-xs font-semibold text-slate-500 hover:text-slate-700">
+                Cancel
+              </Link>
+            </div>
+          ) : loadingProfile ? (
+            <Spinner />
+          ) : (
+            renderStepContent()
+          )}
+        </div>
+
+        {/* Nav buttons */}
+        <div className="flex items-center justify-between mt-6">
+          <button
+            type="button"
+            onClick={handleBack}
+            disabled={step === 0 || submitting}
+            className="px-6 py-2.5 border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+            </svg>
+            Back
+          </button>
+
+          <div className="flex items-center gap-1.5" aria-hidden="true">
+            {STEPS.map((s, i) => (
+              <div
+                key={s.title}
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: i === step ? '24px' : '6px',
+                  height: '6px',
+                  background: i === step ? '#2563eb' : i < step ? '#93c5fd' : '#e2e8f0',
+                }}
+              />
+            ))}
+          </div>
+
+          {!isLast ? (
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={blocked}
+              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200 flex items-center gap-2 disabled:opacity-50"
+            >
+              Continue
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleComplete}
+              disabled={submitting || blocked}
+              className="px-7 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200 flex items-center gap-2 disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  {isEdit ? 'Save changes' : 'Complete Setup'}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

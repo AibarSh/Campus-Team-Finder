@@ -27,74 +27,66 @@ export default function Step2_AcademicInfo({ data = {}, update }) {
   const handleFacultyChange = (e) => {
     const val = e.target.value;
     setFaculty(val);
-    if (update) update({ ...data, faculty: val, studyYear });
+    if (update) update({ faculty: val, studyYear });
   };
 
   const handleSelectYear = (year) => {
     setStudyYear(year);
-    if (update) update({ ...data, faculty, studyYear: year });
+    if (update) update({ faculty, studyYear: year });
   };
 
   return (
-    <div className="space-y-8">
-      {/* Faculty / Department Dropdown */}
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-900">
+    <div className="space-y-6">
+      <div>
+        <label htmlFor="faculty" className="block text-sm font-medium text-slate-700 mb-1.5">
           Faculty / Department
         </label>
-        <div className="relative">
-          <select
-            value={faculty}
-            onChange={handleFacultyChange}
-            className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 text-sm outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white appearance-none text-gray-800 transition cursor-pointer"
-          >
-            <option value="" disabled>
-              Select your faculty...
+        <select
+          id="faculty"
+          value={faculty}
+          onChange={handleFacultyChange}
+          className="w-full h-11 px-4 rounded-xl border border-slate-200 text-slate-900 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
+        >
+          <option value="" disabled>
+            Select your faculty…
+          </option>
+          {FACULTY_OPTIONS.map((f) => (
+            <option key={f} value={f}>
+              {f}
             </option>
-            {FACULTY_OPTIONS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-            <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
-              <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-            </svg>
-          </div>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <div className="block text-sm font-medium text-slate-700 mb-2">Study Year</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {STUDY_YEAR_OPTIONS.map((year) => (
+            <button
+              key={year}
+              type="button"
+              onClick={() => handleSelectYear(year)}
+              className={`h-10 px-4 rounded-xl border text-sm font-medium transition-all text-left ${
+                studyYear === year
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              {year}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Study Year Grid */}
-      <div className="space-y-3">
-        <label className="block text-sm font-medium text-gray-900">Study Year</label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {STUDY_YEAR_OPTIONS.map((year) => {
-            const isSelected = studyYear === year;
-            return (
-              <button
-                key={year}
-                type="button"
-                onClick={() => handleSelectYear(year)}
-                className={`px-5 py-3.5 rounded-2xl border text-sm font-medium text-left transition-all ${
-                  isSelected
-                    ? 'border-2 border-blue-600 bg-blue-50/40 text-blue-900'
-                    : 'border-gray-200 text-gray-700 hover:border-gray-300 bg-white'
-                }`}
-              >
-                {year}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Verification Notice Banner */}
-      <div className="flex items-start gap-3 p-4 bg-blue-50/70 border border-blue-100 rounded-2xl text-blue-800 text-sm leading-relaxed">
-        <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold text-xs mt-0.5">
-          i
-        </div>
-        <p>
+      <div className="bg-blue-50 rounded-xl p-4 flex gap-3">
+        <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fillRule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <p className="text-sm text-blue-700">
           Your profile is verified against the KBTU student directory. Only current students can use KBTU Connect.
         </p>
       </div>
