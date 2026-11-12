@@ -1,122 +1,78 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+// src/App.jsx
+import { useContext } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { UserContext } from './context/UserContext';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import BrowseTeamsPage from './pages/BrowseTeamsPage';
+import TeamDetailsPage from './pages/TeamDetailsPage';
+import MyApplicationsPage from './pages/MyApplicationsPage';
+import MyTeamsPage from './pages/MyTeamsPage';
+import ManageTeamPage from './pages/ManageTeamPage';
+import { CreateTeamRoute } from './pages/CreateTeamWizard';
+import OnboardingWizard from './pages/Onboarding/OnboardingWizard';
+import ProfilePage from './pages/ProfilePage';
+import Layout from './components/Layout';
 
-function App() {
-  const [count, setCount] = useState(0)
+function ProtectedRoute({ children, requireProfile = true }) {
+  const { user, loading } = useContext(UserContext);
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
 
-      <div className="ticks"></div>
+  // Auth Guard
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+  // Profile Guard (Flow 3/4 enforcement)
+  if (requireProfile && !user.profileComplete) {
+    return <Navigate to="/onboarding" replace />;
+  }
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+  return children;
 }
 
-export default App
+const withLayout = (element) => (
+  <ProtectedRoute>
+    <Layout>{element}</Layout>
+  </ProtectedRoute>
+);
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute requireProfile={false}>
+            <OnboardingWizard />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/dashboard" element={withLayout(<DashboardPage />)} />
+      <Route path="/browse" element={withLayout(<BrowseTeamsPage />)} />
+      <Route path="/teams/new" element={withLayout(<CreateTeamRoute />)} />
+      <Route path="/teams/:id" element={withLayout(<TeamDetailsPage />)} />
+      <Route path="/applications" element={withLayout(<MyApplicationsPage />)} />
+      <Route path="/my-teams" element={withLayout(<MyTeamsPage />)} />
+      <Route path="/teams/:id/manage" element={withLayout(<ManageTeamPage />)} />
+      <Route path="/profile" element={withLayout(<ProfilePage />)} />
+      <Route
+        path="/profile/edit"
+        element={
+          <ProtectedRoute>
+            <OnboardingWizard mode="edit" />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+}
