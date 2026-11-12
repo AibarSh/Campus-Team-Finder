@@ -2,6 +2,7 @@ const express = require('express');
 const { authRequired, profileRequired } = require('../middleware/auth');
 const {
   createTeam,
+  updateTeam,
   setOpenRoles,
   publishTeam,
   listMyTeams,
@@ -21,6 +22,7 @@ router.get('/:id', authRequired, profileRequired, getTeam);
 router.post('/:id/roles/:roleId/apply', authRequired, profileRequired, applyToRole);
 router.get('/:id/applications', authRequired, listTeamApplications);
 router.post('/:id/invite', authRequired, profileRequired, inviteUser);
+router.patch('/:id', authRequired, profileRequired, updateTeam);
 router.put('/:id/roles', authRequired, profileRequired, setOpenRoles);
 router.post('/:id/publish', authRequired, profileRequired, publishTeam);
 

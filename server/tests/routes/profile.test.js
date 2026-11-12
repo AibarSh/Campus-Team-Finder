@@ -10,7 +10,7 @@ let cookie;
 
 beforeEach(async () => {
   await resetDb();
-  user = await prisma.user.create({ data: { email: 'a@kbtu.kz', googleId: 'g-1', name: 'A' } });
+  user = await prisma.user.create({ data: { email: 'a@kbtu.kz', name: 'A' } });
   cookie = `session=${signSessionToken(user.id)}`;
 });
 

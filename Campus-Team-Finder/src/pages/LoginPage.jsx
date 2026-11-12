@@ -44,30 +44,55 @@ function NetworkIllustration() {
   );
 }
 
+const MIN_PASSWORD = 8;
+
+const inputClass = (hasError) =>
+  `w-full h-11 px-4 rounded-xl border bg-white text-slate-900 text-sm placeholder-slate-400 outline-none transition-all ${
+    hasError
+      ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-50'
+      : 'border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-50'
+  }`;
+
 export default function LoginPage() {
+  const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const navigate = useNavigate();
   const { setUser } = useContext(UserContext);
+  const registering = mode === 'register';
+
+  const switchMode = () => {
+    setMode(registering ? 'login' : 'register');
+    setPassword('');
+    setConfirm('');
+    setError('');
+  };
+
+  const validate = () => {
+    if (!email.trim()) return 'Please enter your email';
+    if (!email.trim().toLowerCase().endsWith('@kbtu.kz')) return 'Please use your official @kbtu.kz email address';
+    if (!password) return 'Please enter your password';
+    if (registering && password.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters`;
+    if (registering && password !== confirm) return 'Passwords do not match';
+    return '';
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!email) {
-      setError('Please enter your email');
-      return;
-    }
-
-    if (!email.toLowerCase().endsWith('@kbtu.kz')) {
-      setError('Please use your official @kbtu.kz email address');
+    const problem = validate();
+    if (problem) {
+      setError(problem);
       return;
     }
 
     setSubmitting(true);
     try {
-      const { user } = await authApi.devLogin(email);
+      const { user } = await (registering ? authApi.register : authApi.login)(email.trim(), password);
       setUser(user);
       navigate(user.profileComplete ? '/dashboard' : '/onboarding');
     } catch (err) {
@@ -136,8 +161,12 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-8">
-            <h1 className="text-slate-900 text-[1.75rem] font-bold mb-1.5" style={heading}>Welcome!</h1>
-            <p className="text-slate-500 text-sm">Sign in with your KBTU university account.</p>
+            <h1 className="text-slate-900 text-[1.75rem] font-bold mb-1.5" style={heading}>
+              {registering ? 'Create your account' : 'Welcome!'}
+            </h1>
+            <p className="text-slate-500 text-sm">
+              {registering ? 'Sign up with your KBTU university email.' : 'Sign in with your KBTU university account.'}
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -148,34 +177,70 @@ export default function LoginPage() {
               <input
                 id="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   setError('');
                 }}
                 placeholder="yourname@kbtu.kz"
-                className={`w-full h-11 px-4 rounded-xl border bg-white text-slate-900 text-sm placeholder-slate-400 outline-none transition-all ${
-                  error
-                    ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-50'
-                    : 'border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-50'
-                }`}
+                className={inputClass(!!error)}
               />
-              {error && (
-                <p role="alert" className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
-                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  {error}
-                </p>
-              )}
             </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete={registering ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError('');
+                }}
+                placeholder={registering ? `At least ${MIN_PASSWORD} characters` : 'Your password'}
+                className={inputClass(!!error)}
+              />
+            </div>
+
+            {registering && (
+              <div>
+                <label htmlFor="confirm" className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Confirm Password
+                </label>
+                <input
+                  id="confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirm}
+                  onChange={(e) => {
+                    setConfirm(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="Repeat your password"
+                  className={inputClass(!!error)}
+                />
+              </div>
+            )}
+
+            {error && (
+              <p role="alert" className="text-xs text-red-500 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {error}
+              </p>
+            )}
 
             <button
               type="submit"
               disabled={submitting}
               className="w-full h-11 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl transition-colors text-sm shadow-sm shadow-blue-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? 'Signing in...' : 'Sign In to KBTU Connect'}
+              {submitting ? 'Please wait...' : registering ? 'Create Account' : 'Sign In to KBTU Connect'}
               {!submitting && (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
@@ -184,7 +249,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-slate-400 mt-6">Development login — no password required</p>
+          <p className="text-center text-sm text-slate-500 mt-6">
+            {registering ? 'Already have an account?' : 'New to KBTU Connect?'}{' '}
+            <button type="button" onClick={switchMode} className="text-blue-600 font-semibold hover:underline">
+              {registering ? 'Sign in' : 'Create an account'}
+            </button>
+          </p>
         </div>
       </div>
     </div>

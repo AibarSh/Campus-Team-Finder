@@ -1,25 +1,25 @@
 import { createContext, useState, useEffect } from 'react';
 import { authApi } from '../services/api';
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const UserContext = createContext(null);
 
 export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshUser = async () => {
-    try {
-      const data = await authApi.getCurrentUser();
-      setUser(data.user);
-    } catch (err) {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const refreshUser = () =>
+    authApi
+      .getCurrentUser()
+      .then((data) => setUser(data.user))
+      .catch(() => setUser(null));
 
   useEffect(() => {
-    refreshUser();
+    authApi
+      .getCurrentUser()
+      .then((data) => setUser(data.user))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
   }, []);
 
   const logout = async () => {

@@ -14,11 +14,11 @@ let teamOpenRole;
 beforeEach(async () => {
   await resetDb();
   owner = await prisma.user.create({
-    data: { email: 'owner@kbtu.kz', googleId: 'g-owner', name: 'Owner', profileComplete: true },
+    data: { email: 'owner@kbtu.kz', name: 'Owner', profileComplete: true },
   });
   ownerCookie = `session=${signSessionToken(owner.id)}`;
   applicant = await prisma.user.create({
-    data: { email: 'applicant@kbtu.kz', googleId: 'g-applicant', name: 'Applicant', profileComplete: true },
+    data: { email: 'applicant@kbtu.kz', name: 'Applicant', profileComplete: true },
   });
   applicantCookie = `session=${signSessionToken(applicant.id)}`;
 
@@ -50,7 +50,7 @@ test('team creator accepts an application, filling the slot', async () => {
 
 test('rejects accepting once the role has no slots left', async () => {
   const otherApplicant = await prisma.user.create({
-    data: { email: 'other@kbtu.kz', googleId: 'g-other', name: 'Other', profileComplete: true },
+    data: { email: 'other@kbtu.kz', name: 'Other', profileComplete: true },
   });
   const firstApp = await prisma.application.create({
     data: { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: applicant.id, direction: 'APPLICATION' },

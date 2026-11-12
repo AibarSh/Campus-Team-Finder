@@ -17,7 +17,8 @@ const ROLES = [
   'Project Manager', 'QA Engineer',
 ];
 
-// ponytail: demo data so Browse Teams isn't empty until the Create Team page exists
+// Demo data so Browse Teams isn't empty on a fresh database.
+// The demo account has no password, so nobody can sign in as it.
 const DEMO_TEAMS = [
   {
     name: 'AI Study Buddy',
@@ -47,10 +48,9 @@ async function upsertNames(model, names) {
 
 async function seedDemoTeams() {
   const demo = await prisma.user.upsert({
-    where: { googleId: 'dev:demo@kbtu.kz' },
+    where: { email: 'demo@kbtu.kz' },
     update: {},
     create: {
-      googleId: 'dev:demo@kbtu.kz',
       email: 'demo@kbtu.kz',
       name: 'Demo Student',
       firstName: 'Demo',

@@ -1,3 +1,8 @@
 node_modules/
 .DS_Store
 .superpowers/
+.vercel
+.playwright-mcp/
+.env*
+!.env.example
+.neon

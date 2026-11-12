@@ -23,6 +23,22 @@ async function createTeam(req, res, next) {
   }
 }
 
+async function updateTeam(req, res, next) {
+  try {
+    await requireTeamOwner(req.params.id, req.user.id);
+    const { name, eventTarget, description } = req.body;
+    if (!name || !name.trim()) throw new AppError(400, 'name is required');
+
+    const team = await prisma.team.update({
+      where: { id: req.params.id },
+      data: { name, eventTarget, description },
+    });
+    res.json(team);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function setOpenRoles(req, res, next) {
   try {
     const team = await requireTeamOwner(req.params.id, req.user.id);
@@ -201,6 +217,7 @@ async function inviteUser(req, res, next) {
 module.exports = {
   requireTeamOwner,
   createTeam,
+  updateTeam,
   setOpenRoles,
   publishTeam,
   listMyTeams,

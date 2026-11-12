@@ -13,11 +13,11 @@ let teamOpenRole;
 beforeEach(async () => {
   await resetDb();
   owner = await prisma.user.create({
-    data: { email: 'owner@kbtu.kz', googleId: 'g-owner', name: 'Owner', profileComplete: true },
+    data: { email: 'owner@kbtu.kz', name: 'Owner', profileComplete: true },
   });
   ownerCookie = `session=${signSessionToken(owner.id)}`;
   applicant = await prisma.user.create({
-    data: { email: 'applicant@kbtu.kz', googleId: 'g-applicant', name: 'Applicant', profileComplete: true },
+    data: { email: 'applicant@kbtu.kz', name: 'Applicant', profileComplete: true },
   });
 
   const role = await prisma.role.create({ data: { name: 'Backend' } });
@@ -68,10 +68,10 @@ test('a non-creator cannot invite users to the team', async () => {
 
 test('owner listing applications marks SENT ones VIEWED and leaves the rest alone', async () => {
   const other = await prisma.user.create({
-    data: { email: 'other@kbtu.kz', googleId: 'g-other', name: 'Other', profileComplete: true },
+    data: { email: 'other@kbtu.kz', name: 'Other', profileComplete: true },
   });
   const invitee = await prisma.user.create({
-    data: { email: 'invitee@kbtu.kz', googleId: 'g-invitee', name: 'Invitee', profileComplete: true },
+    data: { email: 'invitee@kbtu.kz', name: 'Invitee', profileComplete: true },
   });
   await prisma.application.createMany({
     data: [
