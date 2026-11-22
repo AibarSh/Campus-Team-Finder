@@ -50,6 +50,8 @@ export default function DashboardPage() {
       .catch((err) => setError(err.message));
   }, []);
 
+  // Your own teams are not a recommendation.
+  const recommended = teams.filter((t) => t.creatorId !== user?.id);
   const activeCount = applications.filter((a) => a.status === 'SENT' || a.status === 'VIEWED').length;
   const joinedCount = applications.filter((a) => a.status === 'ACCEPTED').length;
 
@@ -133,7 +135,7 @@ export default function DashboardPage() {
             <h2 className="text-slate-900 font-bold" style={heading}>
               Recommended for you
             </h2>
-            {teams.length > 2 && (
+            {recommended.length > 2 && (
               <Link to="/browse" className="text-sm font-medium text-blue-600 hover:text-blue-700">
                 See all {teams.length} teams
               </Link>
@@ -141,7 +143,7 @@ export default function DashboardPage() {
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
-          {!error && teams.length === 0 && (
+          {!error && recommended.length === 0 && (
             <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
               <div className="text-4xl mb-3">🔍</div>
               <div className="text-slate-700 font-semibold mb-1">No open teams yet</div>
@@ -150,7 +152,7 @@ export default function DashboardPage() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {teams.slice(0, 2).map((team) => (
+            {recommended.slice(0, 2).map((team) => (
               <TeamCard key={team.id} team={team} />
             ))}
           </div>

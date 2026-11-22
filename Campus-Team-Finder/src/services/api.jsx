@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// Local dev talks to the API on port 4000; the deployed build calls /api on its own origin.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? 'http://localhost:4000' : '');
 
 // Central fetch wrapper enforcing JSON & cookie delivery
 async function apiFetch(endpoint, options = {}) {
@@ -30,10 +31,16 @@ async function apiFetch(endpoint, options = {}) {
 
 // Flow 1 — Auth API
 export const authApi = {
-  loginWithGoogle: (idToken) =>
-    apiFetch('/api/auth/google', {
+  register: (email, password) =>
+    apiFetch('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ email, password }),
+    }),
+
+  login: (email, password) =>
+    apiFetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
     }),
 
   logout: () =>
@@ -42,12 +49,6 @@ export const authApi = {
     }),
 
   getCurrentUser: () => apiFetch('/api/auth/me'),
-
-  devLogin: (email) =>
-    apiFetch('/api/auth/dev-login', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    }),
 };
 
 // Flow 2 — Profile Setup API
@@ -118,6 +119,12 @@ export const teamManagementApi = {
   createTeam: (teamData) =>
     apiFetch('/api/teams', {
       method: 'POST',
+      body: JSON.stringify(teamData),
+    }),
+
+  updateTeam: (teamId, teamData) =>
+    apiFetch(`/api/teams/${teamId}`, {
+      method: 'PATCH',
       body: JSON.stringify(teamData),
     }),
 

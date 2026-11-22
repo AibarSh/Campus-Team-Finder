@@ -12,10 +12,10 @@ let teamOpenRole;
 beforeEach(async () => {
   await resetDb();
   const owner = await prisma.user.create({
-    data: { email: 'owner@kbtu.kz', googleId: 'g-owner', name: 'Owner' },
+    data: { email: 'owner@kbtu.kz', name: 'Owner' },
   });
   applicant = await prisma.user.create({
-    data: { email: 'applicant@kbtu.kz', googleId: 'g-applicant', name: 'Applicant', profileComplete: true },
+    data: { email: 'applicant@kbtu.kz', name: 'Applicant', profileComplete: true },
   });
   applicantCookie = `session=${signSessionToken(applicant.id)}`;
 

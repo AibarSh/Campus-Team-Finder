@@ -51,6 +51,7 @@ export default function CreateTeamWizard() {
           return;
         }
         setTeam(t);
+        setInfo({ name: t.name, eventTarget: t.eventTarget || '', description: t.description || '' });
         if (t.openRoles.length > 0) {
           setRows(t.openRoles.map((r) => ({ roleId: r.roleId, slotsTotal: r.slotsTotal })));
         }
@@ -75,12 +76,20 @@ export default function CreateTeamWizard() {
       setError('Team name is required');
       return;
     }
+    const data = {
+      name: info.name.trim(),
+      eventTarget: info.eventTarget.trim() || null,
+      description: info.description.trim() || null,
+    };
     run(async () => {
-      const created = await teamManagementApi.createTeam({
-        name: info.name.trim(),
-        eventTarget: info.eventTarget.trim() || null,
-        description: info.description.trim() || null,
-      });
+      if (team) {
+        // Came back from step 2: update the existing draft instead of creating a second one.
+        const updated = await teamManagementApi.updateTeam(team.id, data);
+        setTeam((t) => ({ ...t, ...updated }));
+        setStep(2);
+        return;
+      }
+      const created = await teamManagementApi.createTeam(data);
       setTeam({ ...created, openRoles: [] });
       setStep(2);
       setSearchParams({ team: created.id }, { replace: true });
@@ -284,10 +293,10 @@ export default function CreateTeamWizard() {
 
         {/* Nav buttons */}
         <div className="flex items-center justify-between mt-6">
-          {step === 3 ? (
+          {step > 1 ? (
             <button
               type="button"
-              onClick={() => setStep(2)}
+              onClick={() => setStep(step - 1)}
               disabled={busy}
               className="px-6 py-2.5 border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-40 flex items-center gap-2"
             >

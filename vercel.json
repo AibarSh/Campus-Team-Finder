@@ -1,0 +1,12 @@
+{
+  "installCommand": "npm ci --prefix server && npm ci --prefix Campus-Team-Finder",
+  "buildCommand": "npm run build --prefix Campus-Team-Finder && cd server && npx prisma generate && DATABASE_URL=\"${DATABASE_URL_UNPOOLED:-$DATABASE_URL}\" npx prisma migrate deploy && node prisma/seed.js",
+  "outputDirectory": "Campus-Team-Finder/dist",
+  "functions": {
+    "api/index.js": { "includeFiles": "server/node_modules/.prisma/client/**" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

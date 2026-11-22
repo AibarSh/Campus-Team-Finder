@@ -10,20 +10,20 @@ let meCookie;
 beforeEach(async () => {
   await resetDb();
   me = await prisma.user.create({
-    data: { email: 'me@kbtu.kz', googleId: 'g-me', name: 'Me', profileComplete: true },
+    data: { email: 'me@kbtu.kz', name: 'Me', profileComplete: true },
   });
   meCookie = `session=${signSessionToken(me.id)}`;
 
   const react = await prisma.skill.create({ data: { name: 'React' } });
   const alice = await prisma.user.create({
-    data: { email: 'alice@kbtu.kz', googleId: 'g-alice', name: 'alice', firstName: 'Alice', profileComplete: true },
+    data: { email: 'alice@kbtu.kz', name: 'alice', firstName: 'Alice', profileComplete: true },
   });
   await prisma.userSkill.create({ data: { userId: alice.id, skillId: react.id, proficiency: 'ADVANCED' } });
   await prisma.user.create({
-    data: { email: 'bob@kbtu.kz', googleId: 'g-bob', name: 'Bob', profileComplete: true },
+    data: { email: 'bob@kbtu.kz', name: 'Bob', profileComplete: true },
   });
   await prisma.user.create({
-    data: { email: 'alina@kbtu.kz', googleId: 'g-alina', name: 'Alina', firstName: 'Alina', profileComplete: false },
+    data: { email: 'alina@kbtu.kz', name: 'Alina', firstName: 'Alina', profileComplete: false },
   });
 });
 
@@ -68,6 +68,6 @@ test('matches by skill name and includes skills', async () => {
 
 test('does not expose internal fields', async () => {
   const res = await search('bob');
-  expect(res.body[0]).not.toHaveProperty('googleId');
+  expect(res.body[0]).not.toHaveProperty('passwordHash');
   expect(res.body[0]).not.toHaveProperty('profileComplete');
 });

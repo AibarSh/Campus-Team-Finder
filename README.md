@@ -41,14 +41,14 @@ npm install
 npm run dev               # http://localhost:5173
 ```
 
-The frontend calls `http://localhost:4000` by default. To point it somewhere else, set `VITE_API_BASE_URL`.
+In dev the frontend calls `http://localhost:4000`. To point it somewhere else, set `VITE_API_BASE_URL`. A production build calls `/api` on its own origin.
 
 ## Testing the app
 
 1. Open http://localhost:5173.
-2. Log in with any email, e.g. `test@kbtu.kz`. There is no password: this is a dev login, enabled by `DEV_LOGIN=true` in `server/.env` and always disabled in production.
+2. Click **Create an account** and sign up with any `@kbtu.kz` email and a password of at least 8 characters. Other email domains are rejected. There is no email confirmation or password reset yet.
 3. Complete onboarding, browse the seeded teams, and apply to a role.
-4. Log in with a second email to test invitations and accepting/declining applications.
+4. Create a second account (in a private window) to test invitations and accepting/declining applications.
 
 ## Backend tests
 
@@ -59,3 +59,14 @@ cd server
 DATABASE_URL="postgresql://campus:campus@localhost:5432/campus_team_finder_test" npx prisma migrate deploy
 npm test
 ```
+
+## Deploying (Vercel + Neon, both free)
+
+The repo root is one Vercel project: the frontend is served as static files and the Express API runs as a serverless function behind `/api` (see `vercel.json` and `api/index.js`). Every build applies database migrations and runs the seed.
+
+1. Create a free PostgreSQL database at https://neon.tech and copy its connection string.
+2. From the repo root run `npx vercel link`, then add two environment variables for Production:
+   - `DATABASE_URL`: the Neon connection string (the pooled one, host contains `-pooler`)
+   - `DATABASE_URL_UNPOOLED` (optional): Neon's direct connection string; migrations use it when set
+   - `JWT_SECRET`: a long random string, e.g. from `openssl rand -hex 32`
+3. Deploy with `npx vercel --prod`.

@@ -12,17 +12,17 @@ let frontendRole;
 beforeEach(async () => {
   await resetDb();
   const user = await prisma.user.create({
-    data: { email: 'a@kbtu.kz', googleId: 'g-1', name: 'A', profileComplete: true },
+    data: { email: 'a@kbtu.kz', name: 'A', profileComplete: true },
   });
   cookie = `session=${signSessionToken(user.id)}`;
   backendRole = await prisma.role.create({ data: { name: 'Backend' } });
   frontendRole = await prisma.role.create({ data: { name: 'Frontend' } });
 
   const fitCreator = await prisma.user.create({
-    data: { email: 'fit@kbtu.kz', googleId: 'g-fit', name: 'FIT Creator', faculty: FACULTIES[0] },
+    data: { email: 'fit@kbtu.kz', name: 'FIT Creator', faculty: FACULTIES[0] },
   });
   const iseCreator = await prisma.user.create({
-    data: { email: 'ise@kbtu.kz', googleId: 'g-ise', name: 'ISE Creator', faculty: FACULTIES[3] },
+    data: { email: 'ise@kbtu.kz', name: 'ISE Creator', faculty: FACULTIES[3] },
   });
 
   const published = await prisma.team.create({

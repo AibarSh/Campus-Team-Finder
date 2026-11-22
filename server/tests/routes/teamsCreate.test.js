@@ -11,7 +11,7 @@ let backendRole;
 beforeEach(async () => {
   await resetDb();
   owner = await prisma.user.create({
-    data: { email: 'owner@kbtu.kz', googleId: 'g-owner', name: 'Owner', profileComplete: true },
+    data: { email: 'owner@kbtu.kz', name: 'Owner', profileComplete: true },
   });
   ownerCookie = `session=${signSessionToken(owner.id)}`;
   backendRole = await prisma.role.create({ data: { name: 'Backend' } });
@@ -35,7 +35,7 @@ test('creates a draft team', async () => {
 test('only the creator can set open roles, and publish requires at least one role', async () => {
   const team = await prisma.team.create({ data: { name: 'Hack Squad', creatorId: owner.id } });
   const otherUser = await prisma.user.create({
-    data: { email: 'other@kbtu.kz', googleId: 'g-other', name: 'Other', profileComplete: true },
+    data: { email: 'other@kbtu.kz', name: 'Other', profileComplete: true },
   });
   const otherCookie = `session=${signSessionToken(otherUser.id)}`;
 
@@ -80,7 +80,7 @@ test('PUT /:id/roles preserves existing Application rows and slotsFilled for unc
   const backendOpenRole = setRoles.body.find((r) => r.roleId === backendRole.id);
 
   const applicant = await prisma.user.create({
-    data: { email: 'applicant@kbtu.kz', googleId: 'g-applicant', name: 'Applicant', profileComplete: true },
+    data: { email: 'applicant@kbtu.kz', name: 'Applicant', profileComplete: true },
   });
   const applicantCookie = `session=${signSessionToken(applicant.id)}`;
 
@@ -127,4 +127,29 @@ test('GET /api/teams/mine lists teams created by the current user', async () => 
   expect(res.status).toBe(200);
   expect(res.body).toHaveLength(1);
   expect(res.body[0].name).toBe('Team A');
+});
+
+test('PATCH /:id lets only the creator edit a draft team', async () => {
+  const app = createApp();
+  const team = (await request(app).post('/api/teams').set('Cookie', [ownerCookie]).send({ name: 'Old name' })).body;
+
+  const res = await request(app)
+    .patch(`/api/teams/${team.id}`)
+    .set('Cookie', [ownerCookie])
+    .send({ name: 'New name', eventTarget: 'HackKBTU', description: null });
+  expect(res.status).toBe(200);
+  expect(res.body.name).toBe('New name');
+  expect(res.body.eventTarget).toBe('HackKBTU');
+
+  const blank = await request(app).patch(`/api/teams/${team.id}`).set('Cookie', [ownerCookie]).send({ name: '  ' });
+  expect(blank.status).toBe(400);
+
+  const other = await prisma.user.create({
+    data: { email: 'intruder@kbtu.kz', name: 'Intruder', profileComplete: true },
+  });
+  const denied = await request(app)
+    .patch(`/api/teams/${team.id}`)
+    .set('Cookie', [`session=${signSessionToken(other.id)}`])
+    .send({ name: 'Hijacked' });
+  expect(denied.status).toBe(403);
 });

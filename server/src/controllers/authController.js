@@ -1,6 +1,6 @@
 const { prisma } = require('../lib/prisma');
-const { verifyGoogleIdToken } = require('../lib/googleAuth');
 const { signSessionToken } = require('../lib/jwt');
+const { hashPassword, verifyPassword } = require('../lib/password');
 const { AppError } = require('../errors');
 
 const SESSION_COOKIE_OPTIONS = {
@@ -10,50 +10,60 @@ const SESSION_COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-async function loginWithGoogle(req, res, next) {
-  try {
-    const { idToken } = req.body;
-    if (!idToken) throw new AppError(400, 'idToken is required');
+const KBTU_EMAIL = /^[^\s@]+@kbtu\.kz$/;
+const MIN_PASSWORD = 8;
+const MAX_PASSWORD = 200;
 
-    const profile = await verifyGoogleIdToken(idToken);
-    if (!profile.email.endsWith('@kbtu.kz')) {
-      throw new AppError(403, 'Use your KBTU email to sign in');
+function readEmail(body) {
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (!email) throw new AppError(400, 'email is required');
+  return email;
+}
+
+function startSession(res, user) {
+  res.cookie('session', signSessionToken(user.id), SESSION_COOKIE_OPTIONS);
+}
+
+// ponytail: no email confirmation and no password reset, both need a mail service.
+// Add them (and a login rate limit) before real students rely on this.
+async function register(req, res, next) {
+  try {
+    const email = readEmail(req.body);
+    if (!KBTU_EMAIL.test(email)) throw new AppError(403, 'Use your @kbtu.kz email to sign up');
+
+    const { password } = req.body;
+    if (typeof password !== 'string' || password.length < MIN_PASSWORD || password.length > MAX_PASSWORD) {
+      throw new AppError(400, `Password must be ${MIN_PASSWORD} to ${MAX_PASSWORD} characters long`);
     }
 
-    const existing = await prisma.user.findUnique({ where: { googleId: profile.googleId } });
-    const user = await prisma.user.upsert({
-      where: { googleId: profile.googleId },
-      update: { name: profile.name, avatarUrl: profile.avatarUrl },
-      create: {
-        googleId: profile.googleId,
-        email: profile.email,
-        name: profile.name,
-        avatarUrl: profile.avatarUrl,
-      },
-    });
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: { email, name: email.split('@')[0], passwordHash: hashPassword(password) },
+      });
+    } catch (err) {
+      if (err.code === 'P2002') throw new AppError(409, 'An account with this email already exists');
+      throw err;
+    }
 
-    const token = signSessionToken(user.id);
-    res.cookie('session', token, SESSION_COOKIE_OPTIONS);
-    res.json({ user, isNewUser: !existing });
+    startSession(res, user);
+    res.status(201).json({ user });
   } catch (err) {
     next(err);
   }
 }
 
-async function devLogin(req, res, next) {
+async function login(req, res, next) {
   try {
-    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    if (!email) throw new AppError(400, 'email is required');
-    if (!email.endsWith('@kbtu.kz')) throw new AppError(403, 'Use your KBTU email to sign in');
+    const email = readEmail(req.body);
+    const found = await prisma.user.findUnique({ where: { email }, omit: { passwordHash: false } });
+    if (!found || !verifyPassword(req.body.password, found.passwordHash)) {
+      throw new AppError(401, 'Invalid email or password');
+    }
 
-    const googleId = `dev:${email}`;
-    const existing = await prisma.user.findUnique({ where: { googleId } });
-    const user =
-      existing ||
-      (await prisma.user.create({ data: { googleId, email, name: email.split('@')[0] } }));
-
-    res.cookie('session', signSessionToken(user.id), SESSION_COOKIE_OPTIONS);
-    res.json({ user, isNewUser: !existing });
+    const { passwordHash: _hash, ...user } = found;
+    startSession(res, user);
+    res.json({ user });
   } catch (err) {
     next(err);
   }
@@ -68,4 +78,4 @@ function logout(req, res) {
   res.json({ ok: true });
 }
 
-module.exports = { loginWithGoogle, devLogin, me, logout };
+module.exports = { register, login, me, logout };

@@ -31,7 +31,7 @@ test('rejects requests with no session cookie', async () => {
 
 test('accepts a valid session cookie and sets req.user', async () => {
   const user = await prisma.user.create({
-    data: { email: 'a@kbtu.kz', googleId: 'g-1', name: 'A' },
+    data: { email: 'a@kbtu.kz', name: 'A' },
   });
   const token = signSessionToken(user.id);
   const res = await request(buildTestApp()).get('/whoami').set('Cookie', [`session=${token}`]);
@@ -41,7 +41,7 @@ test('accepts a valid session cookie and sets req.user', async () => {
 
 test('profileRequired blocks users with an incomplete profile', async () => {
   const user = await prisma.user.create({
-    data: { email: 'b@kbtu.kz', googleId: 'g-2', name: 'B', profileComplete: false },
+    data: { email: 'b@kbtu.kz', name: 'B', profileComplete: false },
   });
   const token = signSessionToken(user.id);
   const res = await request(buildTestApp()).get('/needs-profile').set('Cookie', [`session=${token}`]);
@@ -50,7 +50,7 @@ test('profileRequired blocks users with an incomplete profile', async () => {
 
 test('profileRequired allows users with a complete profile', async () => {
   const user = await prisma.user.create({
-    data: { email: 'c@kbtu.kz', googleId: 'g-3', name: 'C', profileComplete: true },
+    data: { email: 'c@kbtu.kz', name: 'C', profileComplete: true },
   });
   const token = signSessionToken(user.id);
   const res = await request(buildTestApp()).get('/needs-profile').set('Cookie', [`session=${token}`]);
