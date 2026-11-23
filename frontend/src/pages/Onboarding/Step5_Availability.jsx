@@ -7,25 +7,27 @@ const LINK_FIELDS = [
   { key: 'telegram', placeholder: '@username', icon: 'TG', bg: '#2aabee', label: 'Telegram' },
 ];
 
-export default function Step5_Availability({ data = {}, update }) {
+export default function Step5_Availability({ data = {}, update, errors = {} }) {
   const [availability, setAvailability] = useState(data.availability || '');
   const [links, setLinks] = useState({ github: '', linkedin: '', telegram: '', ...(data.links || {}) });
 
   const handleSelectAvailability = (id) => {
     setAvailability(id);
-    if (update) update({ availability: id, links });
+    update?.({ availability: id });
   };
 
   const handleLinkChange = (field, value) => {
     const next = { ...links, [field]: value };
     setLinks(next);
-    if (update) update({ availability, links: next });
+    update?.({ links: next });
   };
 
   return (
     <div className="space-y-7">
       <div>
-        <div className="block text-sm font-medium text-slate-700 mb-3">Weekly Availability</div>
+        <div className="block text-sm font-medium text-slate-700 mb-3">
+          Weekly Availability <span className="text-red-500">*</span>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {AVAILABILITY_OPTIONS.map((opt) => {
             const selected = availability === opt.id;
@@ -38,6 +40,8 @@ export default function Step5_Availability({ data = {}, update }) {
                 className={`p-4 rounded-xl border text-left transition-all ${
                   selected
                     ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-400'
+                    : errors.availability
+                    ? 'border-red-200 hover:border-slate-300 hover:bg-slate-50'
                     : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -49,6 +53,11 @@ export default function Step5_Availability({ data = {}, update }) {
             );
           })}
         </div>
+        {errors.availability && (
+          <p role="alert" className="mt-2 text-xs text-red-500">
+            {errors.availability}
+          </p>
+        )}
       </div>
 
       <div>
@@ -73,7 +82,7 @@ export default function Step5_Availability({ data = {}, update }) {
             </div>
           ))}
         </div>
-        <p className="text-xs text-slate-400 mt-3">All links are optional but help teams learn more about you</p>
+        <p className="text-xs text-slate-400 mt-3">Links are optional but help teams learn more about you</p>
       </div>
     </div>
   );

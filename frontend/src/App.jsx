@@ -14,6 +14,27 @@ import OnboardingWizard from './pages/Onboarding/OnboardingWizard';
 import ProfilePage from './pages/ProfilePage';
 import Layout from './components/Layout';
 
+// ---------------------------------------------------------------------------
+// DEV ONLY: lets you open every screen without a backend or login.
+// Enable with VITE_BYPASS_AUTH=true in frontend/.env.local (restart `npm run dev`).
+// Set VITE_MOCK_PROFILE_COMPLETE=false to be redirected into /onboarding like a new user.
+// `import.meta.env.DEV` is false in production builds, so this can never disable auth on Vercel.
+// ---------------------------------------------------------------------------
+const BYPASS_AUTH = import.meta.env.DEV && import.meta.env.VITE_BYPASS_AUTH === 'true';
+
+const MOCK_CONTEXT = {
+  user: {
+    id: 'dev-user',
+    email: 'dev@kbtu.kz',
+    firstName: 'Aibar',
+    lastName: 'Dev',
+    profileComplete: import.meta.env.VITE_MOCK_PROFILE_COMPLETE !== 'false',
+  },
+  setUser: () => {},
+  loading: false,
+  refreshUser: async () => {},
+};
+
 function ProtectedRoute({ children, requireProfile = true }) {
   const { user, loading } = useContext(UserContext);
 
@@ -45,7 +66,7 @@ const withLayout = (element) => (
 );
 
 export default function App() {
-  return (
+  const routes = (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
@@ -75,4 +96,8 @@ export default function App() {
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
+
+  // In bypass mode, this Provider sits closer to the routes than your real one,
+  // so every useContext(UserContext) below receives the mock user.
+  return BYPASS_AUTH ? <UserContext.Provider value={MOCK_CONTEXT}>{routes}</UserContext.Provider> : routes;
 }

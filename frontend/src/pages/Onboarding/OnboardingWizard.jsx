@@ -8,6 +8,7 @@ import Step5_Availability from './Step5_Availability';
 import { profileApi } from '../../services/api';
 import { UserContext } from '../../context/UserContext';
 import { profileToFormData } from '../../lib/profileForm';
+import { saveProfilePhoto } from '../../lib/profilePhoto';
 import { Spinner } from '../../components/Feedback';
 
 const heading = { fontFamily: 'Outfit, sans-serif' };
@@ -19,6 +20,27 @@ const STEPS = [
   { title: 'Interests & Roles', desc: 'What do you want to work on?' },
   { title: 'Availability & Links', desc: 'How teams can reach you' },
 ];
+
+export const MIN_SKILLS = 2;
+
+// Required fields per step. Returns { fieldName: message }; empty object means the step is valid.
+function validateStep(step, d) {
+  const e = {};
+  if (step === 0) {
+    if (!d.firstName?.trim()) e.firstName = 'First name is required';
+    if (!d.lastName?.trim()) e.lastName = 'Last name is required';
+  } else if (step === 1) {
+    if (!d.faculty) e.faculty = 'Select your faculty';
+    if (!d.studyYear) e.studyYear = 'Select your study year';
+  } else if (step === 2) {
+    if ((d.skills?.length || 0) < MIN_SKILLS) e.skills = `Add at least ${MIN_SKILLS} skills`;
+  } else if (step === 4) {
+    if (!d.availability) e.availability = 'Select your weekly availability';
+  }
+  return e;
+}
+
+const firstInvalidStep = (d) => STEPS.findIndex((_, i) => Object.keys(validateStep(i, d)).length > 0);
 
 function ErrorAlert({ children }) {
   return (
@@ -34,14 +56,20 @@ export default function OnboardingWizard({ mode = 'create' }) {
     firstName: '',
     lastName: '',
     bio: '',
+    photoFile: null,
+    photoPreview: '',
+    photoRemoved: false,
     faculty: '',
     studyYear: '',
     skills: [],
     interests: [],
     roles: [],
+    customInterests: [],
+    customRoles: [],
     availability: '',
     links: { github: '', linkedin: '', telegram: '' },
   });
+  const [attempted, setAttempted] = useState(false); // person pressed Continue on this step
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [loadFailed, setLoadFailed] = useState(false);
@@ -56,7 +84,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
     if (!isEdit) return;
     profileApi
       .getProfile()
-      .then((profile) => setFormData(profileToFormData(profile)))
+      .then((profile) => setFormData((prev) => ({ ...prev, ...profileToFormData(profile) })))
       .catch((err) => {
         setError(err.message);
         setLoadFailed(true);
@@ -66,37 +94,68 @@ export default function OnboardingWizard({ mode = 'create' }) {
 
   useEffect(() => () => clearTimeout(redirectTimer.current), []);
 
-  const updateFormData = (newData) => setFormData((prev) => ({ ...prev, ...newData }));
+  // Steps send only the fields they changed
+  const updateFormData = (patch) => setFormData((prev) => ({ ...prev, ...patch }));
+
+  // Errors are only shown after the first Continue press, then update live as the person fixes them
+  const errors = attempted ? validateStep(step, formData) : {};
 
   const handleNext = () => {
     setError('');
+    if (Object.keys(validateStep(step, formData)).length > 0) {
+      setAttempted(true);
+      return;
+    }
+    setAttempted(false);
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
   const handleBack = () => {
     setError('');
-    setStep((s) => Math.max(s - 1, 0));
+    setAttempted(false);
+    if (step === 0) {
+      // First step: leave the wizard (back to login for new users, back to the profile when editing)
+      navigate(isEdit ? '/profile' : '/login');
+      return;
+    }
+    setStep((s) => s - 1);
   };
 
   const handleComplete = async () => {
-    setSubmitting(true);
     setError('');
 
+    // Make sure every step is valid (the person could have skipped around while editing)
+    const invalid = firstInvalidStep(formData);
+    if (invalid !== -1) {
+      setStep(invalid);
+      setAttempted(true);
+      return;
+    }
+
+    setSubmitting(true);
     try {
       await profileApi.updateProfile({
-        firstName: formData.firstName || null,
-        lastName: formData.lastName || null,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
         bio: formData.bio || null,
-        faculty: formData.faculty || null,
-        studyYear: formData.studyYear || null,
-        availability: formData.availability || null,
+        faculty: formData.faculty,
+        studyYear: formData.studyYear,
+        availability: formData.availability,
         githubUrl: formData.links?.github || null,
         linkedinUrl: formData.links?.linkedin || null,
         telegramHandle: formData.links?.telegram || null,
       });
+
+      // Photo: no-op until the backend endpoint exists (see lib/profilePhoto.js)
+      await saveProfilePhoto({ file: formData.photoFile, removed: formData.photoRemoved });
+
       await profileApi.updateSkills(formData.skills.map((s) => ({ skillId: s.id, proficiency: s.level })));
-      await profileApi.updateInterests(formData.interests);
-      await profileApi.updatePreferredRoles(formData.roles);
+
+      // TODO(backend): the second argument carries the free-text entries the person typed in.
+      // Until updateInterests / updatePreferredRoles (and the API) accept it, those are ignored.
+      await profileApi.updateInterests(formData.interests, formData.customInterests);
+      await profileApi.updatePreferredRoles(formData.roles, formData.customRoles);
+
       if (!isEdit) await profileApi.completeProfile();
       await refreshUser();
 
@@ -117,15 +176,21 @@ export default function OnboardingWizard({ mode = 'create' }) {
   const renderStepContent = () => {
     switch (step) {
       case 0:
-        return <Step1_PersonalInfo data={formData} update={updateFormData} />;
+        return <Step1_PersonalInfo data={formData} update={updateFormData} errors={errors} />;
       case 1:
-        return <Step2_AcademicInfo data={formData} update={updateFormData} />;
+        return <Step2_AcademicInfo data={formData} update={updateFormData} errors={errors} />;
       case 2:
-        return <Step3_Skills data={formData.skills} update={(skills) => updateFormData({ skills })} />;
+        return (
+          <Step3_Skills
+            data={formData.skills}
+            update={(skills) => updateFormData({ skills })}
+            error={errors.skills}
+          />
+        );
       case 3:
         return <Step4_Interests data={formData} update={updateFormData} />;
       case 4:
-        return <Step5_Availability data={formData} update={updateFormData} />;
+        return <Step5_Availability data={formData} update={updateFormData} errors={errors} />;
       default:
         return null;
     }
@@ -230,7 +295,14 @@ export default function OnboardingWizard({ mode = 'create' }) {
           ) : loadingProfile ? (
             <Spinner />
           ) : (
-            renderStepContent()
+            <>
+              {step !== 3 && (
+                <p className="text-xs text-slate-400">
+                  Fields marked <span className="text-red-500">*</span> are required.
+                </p>
+              )}
+              {renderStepContent()}
+            </>
           )}
         </div>
 
@@ -239,7 +311,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
           <button
             type="button"
             onClick={handleBack}
-            disabled={step === 0 || submitting}
+            disabled={submitting}
             className="px-6 py-2.5 border border-slate-200 text-slate-600 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

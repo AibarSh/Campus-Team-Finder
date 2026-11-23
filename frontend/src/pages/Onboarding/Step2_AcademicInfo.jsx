@@ -20,32 +20,45 @@ const STUDY_YEAR_OPTIONS = [
   'PhD',
 ];
 
-export default function Step2_AcademicInfo({ data = {}, update }) {
+function FieldError({ children }) {
+  if (!children) return null;
+  return (
+    <p role="alert" className="mt-1.5 text-xs text-red-500">
+      {children}
+    </p>
+  );
+}
+
+export default function Step2_AcademicInfo({ data = {}, update, errors = {} }) {
   const [faculty, setFaculty] = useState(data.faculty || '');
   const [studyYear, setStudyYear] = useState(data.studyYear || '');
 
   const handleFacultyChange = (e) => {
-    const val = e.target.value;
-    setFaculty(val);
-    if (update) update({ faculty: val, studyYear });
+    setFaculty(e.target.value);
+    update?.({ faculty: e.target.value });
   };
 
   const handleSelectYear = (year) => {
     setStudyYear(year);
-    if (update) update({ faculty, studyYear: year });
+    update?.({ studyYear: year });
   };
 
   return (
     <div className="space-y-6">
       <div>
         <label htmlFor="faculty" className="block text-sm font-medium text-slate-700 mb-1.5">
-          Faculty / Department
+          Faculty / Department <span className="text-red-500">*</span>
         </label>
         <select
           id="faculty"
           value={faculty}
           onChange={handleFacultyChange}
-          className="w-full h-11 px-4 rounded-xl border border-slate-200 text-slate-900 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white"
+          aria-invalid={!!errors.faculty}
+          className={`w-full h-11 px-4 rounded-xl border text-slate-900 text-sm outline-none transition-all bg-white ${
+            errors.faculty
+              ? 'border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-50'
+              : 'border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-50'
+          }`}
         >
           <option value="" disabled>
             Select your faculty…
@@ -56,19 +69,25 @@ export default function Step2_AcademicInfo({ data = {}, update }) {
             </option>
           ))}
         </select>
+        <FieldError>{errors.faculty}</FieldError>
       </div>
 
       <div>
-        <div className="block text-sm font-medium text-slate-700 mb-2">Study Year</div>
+        <div className="block text-sm font-medium text-slate-700 mb-2">
+          Study Year <span className="text-red-500">*</span>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {STUDY_YEAR_OPTIONS.map((year) => (
             <button
               key={year}
               type="button"
               onClick={() => handleSelectYear(year)}
+              aria-pressed={studyYear === year}
               className={`h-10 px-4 rounded-xl border text-sm font-medium transition-all text-left ${
                 studyYear === year
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : errors.studyYear
+                  ? 'border-red-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                   : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
               }`}
             >
@@ -76,6 +95,7 @@ export default function Step2_AcademicInfo({ data = {}, update }) {
             </button>
           ))}
         </div>
+        <FieldError>{errors.studyYear}</FieldError>
       </div>
 
       <div className="bg-blue-50 rounded-xl p-4 flex gap-3">
