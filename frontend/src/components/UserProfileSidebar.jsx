@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import { UserContext } from '../context/UserContext';
 import { profileApi } from '../services/api';
 import { displayName, initials } from '../lib/names';
+import { getProfileSkills } from '../lib/profileForm';
 
 export default function UserProfileSidebar() {
   const { user } = useContext(UserContext);
@@ -10,7 +11,7 @@ export default function UserProfileSidebar() {
   useEffect(() => {
     profileApi
       .getProfile()
-      .then((profile) => setSkills(profile.skills.map((s) => s.skill.name)))
+      .then((profile) => setSkills(getProfileSkills(profile).map((s) => s.name)))
       .catch(() => setSkills([]));
   }, []);
 
@@ -34,7 +35,7 @@ export default function UserProfileSidebar() {
         <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Top skills</h4>
         <div className="flex flex-wrap gap-1.5">
           {skills.map((skill) => (
-            <span key={skill} className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg">
+            <span key={skill} className="max-w-full wrap-anywhere px-3 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-lg">
               {skill}
             </span>
           ))}

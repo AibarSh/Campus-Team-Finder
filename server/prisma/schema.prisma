@@ -52,6 +52,7 @@ model User {
   updatedAt       DateTime @updatedAt
 
   skills         UserSkill[]
+  customSkills   UserCustomSkill[]
   interests      UserInterest[]
   preferredRoles UserPreferredRole[]
   teamsCreated   Team[]              @relation("TeamCreator")
@@ -74,6 +75,17 @@ model UserSkill {
   skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@id([userId, skillId])
+}
+
+model UserCustomSkill {
+  userId         String
+  normalizedName String
+  name           String
+  proficiency    Proficiency
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, normalizedName])
 }
 
 model Interest {

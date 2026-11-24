@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { profileApi } from '../services/api';
 import { displayName, initials } from '../lib/names';
+import { getProfileSkills } from '../lib/profileForm';
 import { AVAILABILITY_OPTIONS } from '../lib/profileOptions';
 import { ErrorBox, Spinner } from '../components/Feedback';
 
@@ -61,6 +62,7 @@ export default function ProfilePage() {
   }
 
   const availability = AVAILABILITY_OPTIONS.find((o) => o.id === profile.availability)?.title;
+  const skills = getProfileSkills(profile);
   const links = [
     profile.githubUrl && { href: profile.githubUrl, label: 'GitHub' },
     profile.linkedinUrl && { href: profile.linkedinUrl, label: 'LinkedIn' },
@@ -102,19 +104,19 @@ export default function ProfilePage() {
 
         {/* Skills */}
         <Card title="Skills">
-          {profile.skills.length === 0 ? (
+          {skills.length === 0 ? (
             <NotSet />
           ) : (
             <div className="flex flex-wrap gap-2">
-              {profile.skills.map((s) => {
-                const level = s.proficiency?.toLowerCase();
+              {skills.map((s) => {
+                const level = s.level?.toLowerCase();
                 const color = LEVEL_COLORS[level] || LEVEL_COLORS.beginner;
                 return (
                   <div
-                    key={s.skill.name}
-                    className="flex items-center gap-2 pl-3 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl"
+                    key={s.name}
+                    className="flex min-w-0 max-w-full flex-wrap items-center gap-2 pl-3 pr-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl"
                   >
-                    <span className="text-sm font-medium text-slate-800">{s.skill.name}</span>
+                    <span className="min-w-0 wrap-anywhere text-sm font-medium text-slate-800">{s.name}</span>
                     {level && (
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-full capitalize"

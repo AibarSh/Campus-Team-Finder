@@ -61,10 +61,10 @@ export const profileApi = {
       body: JSON.stringify(data),
     }),
 
-  updateSkills: (skills) =>
+  updateSkills: (skills, customSkills) =>
     apiFetch('/api/profile/skills', {
       method: 'PUT',
-      body: JSON.stringify({ skills }), // [{ skillId, proficiency }]
+      body: JSON.stringify({ skills, customSkills }),
     }),
 
   updateInterests: (interestIds) =>

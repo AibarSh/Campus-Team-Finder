@@ -1,3 +1,4 @@
+const { Proficiency } = require('@prisma/client');
 const { prisma } = require('../lib/prisma');
 const { AppError } = require('../errors');
 const { FACULTIES, STUDY_YEARS, AVAILABILITY } = require('../lib/profileOptions');
@@ -17,6 +18,12 @@ const PATCHABLE_FIELDS = [
 ];
 
 const ALLOWED_VALUES = { faculty: FACULTIES, studyYear: STUDY_YEARS, availability: AVAILABILITY };
+const MAX_SKILL_NAME_LENGTH = 200;
+const PROFICIENCIES = new Set(Object.values(Proficiency));
+const PROFILE_SKILLS = {
+  skills: { include: { skill: true } },
+  customSkills: { select: { name: true, proficiency: true }, orderBy: { normalizedName: 'asc' } },
+};
 
 function validateField(field, value) {
   if (value === null) return;
@@ -33,7 +40,7 @@ async function getProfile(req, res, next) {
     const profile = await prisma.user.findUnique({
       where: { id: req.user.id },
       include: {
-        skills: { include: { skill: true } },
+        ...PROFILE_SKILLS,
         interests: { include: { interest: true } },
         preferredRoles: { include: { role: true } },
       },
@@ -69,20 +76,66 @@ async function patchProfile(req, res, next) {
 
 async function putSkills(req, res, next) {
   try {
-    const skills = req.body.skills;
+    const { skills, customSkills } = req.body;
     if (!Array.isArray(skills)) throw new AppError(400, 'skills must be an array of { skillId, proficiency }');
-
-    await prisma.$transaction([
-      prisma.userSkill.deleteMany({ where: { userId: req.user.id } }),
-      prisma.userSkill.createMany({
-        data: skills.map((s) => ({ userId: req.user.id, skillId: s.skillId, proficiency: s.proficiency })),
-      }),
-    ]);
-    const updated = await prisma.userSkill.findMany({
-      where: { userId: req.user.id },
-      include: { skill: true },
+    if (customSkills !== undefined && !Array.isArray(customSkills)) {
+      throw new AppError(400, 'customSkills must be an array of { name, proficiency }');
+    }
+    if (skills.some((item) => typeof item?.skillId !== 'string' || !PROFICIENCIES.has(item.proficiency))) {
+      throw new AppError(400, 'Invalid skill or proficiency');
+    }
+    const customEntries = customSkills?.map((item) => {
+      const name = typeof item?.name === 'string' ? item.name.trim() : '';
+      if (!name || name.length > MAX_SKILL_NAME_LENGTH || name.includes('\0')) {
+        throw new AppError(400, `Skill name must be 1 to ${MAX_SKILL_NAME_LENGTH} characters`);
+      }
+      if (!PROFICIENCIES.has(item.proficiency)) throw new AppError(400, 'Invalid skill proficiency');
+      return { name, normalizedName: name.toLowerCase(), proficiency: item.proficiency };
     });
-    res.json(updated);
+
+    const userId = req.user.id;
+    const updated = await prisma.$transaction(async (tx) => {
+      // Serialize replacements for the same profile, even when both lists are empty.
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+      const catalog = await tx.skill.findMany({
+        where: customEntries?.length ? undefined : { id: { in: skills.map((item) => item.skillId) } },
+        select: { id: true, name: true },
+      });
+      const byId = new Map(catalog.map((skill) => [skill.id, skill]));
+      const byName = new Map(catalog.map((skill) => [skill.name.trim().toLowerCase(), skill]));
+      const seen = new Set();
+      const claimName = (name) => {
+        if (seen.has(name)) throw new AppError(409, 'You already added this skill');
+        seen.add(name);
+      };
+
+      const catalogRows = skills.map(({ skillId, proficiency }) => {
+        const skill = byId.get(skillId);
+        if (!skill) throw new AppError(400, 'Referenced record does not exist');
+        claimName(skill.name.trim().toLowerCase());
+        return { userId, skillId, proficiency };
+      });
+      const customRows = [];
+      const entries = customEntries ?? await tx.userCustomSkill.findMany({ where: { userId } });
+      for (const { name, normalizedName, proficiency } of entries) {
+        claimName(normalizedName);
+        const skill = byName.get(normalizedName);
+        if (skill) {
+          catalogRows.push({ userId, skillId: skill.id, proficiency });
+        } else {
+          customRows.push({ userId, name, normalizedName, proficiency });
+        }
+      }
+
+      await tx.userSkill.deleteMany({ where: { userId } });
+      await tx.userSkill.createMany({ data: catalogRows });
+      if (customEntries !== undefined) {
+        await tx.userCustomSkill.deleteMany({ where: { userId } });
+        await tx.userCustomSkill.createMany({ data: customRows });
+      }
+      return tx.user.findUniqueOrThrow({ where: { id: userId }, select: PROFILE_SKILLS });
+    });
+    res.json(customEntries === undefined ? updated.skills : updated);
   } catch (err) {
     next(err);
   }

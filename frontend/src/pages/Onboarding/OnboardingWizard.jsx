@@ -24,7 +24,7 @@ const STEPS = [
 export const MIN_SKILLS = 2;
 
 // Required fields per step. Returns { fieldName: message }; empty object means the step is valid.
-function validateStep(step, d) {
+function validateStep(step, d, minSkills) {
   const e = {};
   if (step === 0) {
     if (!d.firstName?.trim()) e.firstName = 'First name is required';
@@ -33,14 +33,12 @@ function validateStep(step, d) {
     if (!d.faculty) e.faculty = 'Select your faculty';
     if (!d.studyYear) e.studyYear = 'Select your study year';
   } else if (step === 2) {
-    if ((d.skills?.length || 0) < MIN_SKILLS) e.skills = `Add at least ${MIN_SKILLS} skills`;
+    if (d.skills.length < minSkills) e.skills = `Add at least ${minSkills} skills`;
   } else if (step === 4) {
     if (!d.availability) e.availability = 'Select your weekly availability';
   }
   return e;
 }
-
-const firstInvalidStep = (d) => STEPS.findIndex((_, i) => Object.keys(validateStep(i, d)).length > 0);
 
 function ErrorAlert({ children }) {
   return (
@@ -50,6 +48,7 @@ function ErrorAlert({ children }) {
 
 export default function OnboardingWizard({ mode = 'create' }) {
   const isEdit = mode === 'edit';
+  const minSkills = isEdit ? 0 : MIN_SKILLS;
   const [loadingProfile, setLoadingProfile] = useState(isEdit);
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({
@@ -98,11 +97,11 @@ export default function OnboardingWizard({ mode = 'create' }) {
   const updateFormData = (patch) => setFormData((prev) => ({ ...prev, ...patch }));
 
   // Errors are only shown after the first Continue press, then update live as the person fixes them
-  const errors = attempted ? validateStep(step, formData) : {};
+  const errors = attempted ? validateStep(step, formData, minSkills) : {};
 
   const handleNext = () => {
     setError('');
-    if (Object.keys(validateStep(step, formData)).length > 0) {
+    if (Object.keys(validateStep(step, formData, minSkills)).length > 0) {
       setAttempted(true);
       return;
     }
@@ -125,7 +124,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
     setError('');
 
     // Make sure every step is valid (the person could have skipped around while editing)
-    const invalid = firstInvalidStep(formData);
+    const invalid = STEPS.findIndex((_, i) => Object.keys(validateStep(i, formData, minSkills)).length > 0);
     if (invalid !== -1) {
       setStep(invalid);
       setAttempted(true);
@@ -149,7 +148,10 @@ export default function OnboardingWizard({ mode = 'create' }) {
       // Photo: no-op until the backend endpoint exists (see lib/profilePhoto.js)
       await saveProfilePhoto({ file: formData.photoFile, removed: formData.photoRemoved });
 
-      await profileApi.updateSkills(formData.skills.map((s) => ({ skillId: s.id, proficiency: s.level })));
+      await profileApi.updateSkills(
+        formData.skills.filter((s) => s.id !== null).map((s) => ({ skillId: s.id, proficiency: s.level })),
+        formData.skills.filter((s) => s.id === null).map((s) => ({ name: s.name, proficiency: s.level })),
+      );
 
       // TODO(backend): the second argument carries the free-text entries the person typed in.
       // Until updateInterests / updatePreferredRoles (and the API) accept it, those are ignored.
@@ -183,6 +185,7 @@ export default function OnboardingWizard({ mode = 'create' }) {
         return (
           <Step3_Skills
             data={formData.skills}
+            minSkills={minSkills}
             update={(skills) => updateFormData({ skills })}
             error={errors.skills}
           />

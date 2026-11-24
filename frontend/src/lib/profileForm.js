@@ -1,3 +1,10 @@
+export function getProfileSkills(profile) {
+  return [
+    ...profile.skills.map((s) => ({ id: s.skill.id, name: s.skill.name, level: s.proficiency })),
+    ...(profile.customSkills ?? []).map((s) => ({ id: null, name: s.name, level: s.proficiency })),
+  ];
+}
+
 // Shape must match OnboardingWizard's formData
 export function profileToFormData(profile) {
   return {
@@ -6,7 +13,7 @@ export function profileToFormData(profile) {
     bio: profile.bio || '',
     faculty: profile.faculty || '',
     studyYear: profile.studyYear || '',
-    skills: profile.skills.map((s) => ({ id: s.skill.id, name: s.skill.name, level: s.proficiency })),
+    skills: getProfileSkills(profile),
     interests: profile.interests.map((i) => i.interest.id),
     roles: profile.preferredRoles.map((r) => r.role.id),
     availability: profile.availability || '',

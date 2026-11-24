@@ -35,6 +35,68 @@ test('PUT /api/profile/skills replaces the skill set', async () => {
   expect(res.body[0].proficiency).toBe('ADVANCED');
 });
 
+test('profile skills save both types without changing the catalog and can be replaced independently', async () => {
+  const api = request(createApp());
+  const save = (data) => api.put('/api/profile/skills').set('Cookie', [cookie]).send(data);
+  const getProfile = () => api.get('/api/profile').set('Cookie', [cookie]);
+
+  const saved = await save({
+    skills: [],
+    customSkills: [
+      { name: ' react ', proficiency: 'BEGINNER' },
+      { name: '  Prompt Engineering  ', proficiency: 'INTERMEDIATE' },
+    ],
+  });
+  expect(saved.status).toBe(200);
+  expect(saved.body.skills).toMatchObject([{ skillId: reactSkill.id, proficiency: 'BEGINNER' }]);
+  expect(saved.body.customSkills).toEqual([{ name: 'Prompt Engineering', proficiency: 'INTERMEDIATE' }]);
+  const profile = await getProfile();
+  expect(profile.body.skills).toMatchObject([{ skillId: reactSkill.id, proficiency: 'BEGINNER' }]);
+  expect(profile.body.customSkills).toEqual([{ name: 'Prompt Engineering', proficiency: 'INTERMEDIATE' }]);
+
+  const catalog = await api.get('/api/lookups/skills').set('Cookie', [cookie]);
+  expect(catalog.body).toEqual([reactSkill]);
+
+  const legacy = await save({ skills: [{ skillId: reactSkill.id, proficiency: 'ADVANCED' }] });
+  expect(legacy.status).toBe(200);
+  expect(legacy.body).toHaveLength(1);
+  expect((await getProfile()).body.customSkills).toEqual(profile.body.customSkills);
+
+  const edited = await save({
+    skills: [],
+    customSkills: [{ name: 'Prompt Engineering', proficiency: 'ADVANCED' }],
+  });
+  expect(edited.status).toBe(200);
+  const after = await getProfile();
+  expect(after.body.skills).toEqual([]);
+  expect(after.body.customSkills).toEqual([{ name: 'Prompt Engineering', proficiency: 'ADVANCED' }]);
+});
+
+test('blank and duplicate skill names are rejected without replacing the saved profile', async () => {
+  const api = request(createApp());
+  const save = (data) => api.put('/api/profile/skills').set('Cookie', [cookie]).send(data);
+  const catalogSkills = [{ skillId: reactSkill.id, proficiency: 'BEGINNER' }];
+  expect((await save({ skills: catalogSkills })).status).toBe(200);
+
+  expect((await save({ skills: [], customSkills: [{ name: '  ', proficiency: 'ADVANCED' }] })).status).toBe(400);
+  const duplicateCatalog = await save({
+    skills: catalogSkills,
+    customSkills: [{ name: ' REACT ', proficiency: 'ADVANCED' }],
+  });
+  expect(duplicateCatalog.status).toBe(409);
+  const duplicateCustom = await save({
+    skills: [],
+    customSkills: [
+      { name: 'Prompt Engineering', proficiency: 'BEGINNER' },
+      { name: ' prompt engineering ', proficiency: 'ADVANCED' },
+    ],
+  });
+  expect(duplicateCustom.status).toBe(409);
+  const unchanged = await api.get('/api/profile').set('Cookie', [cookie]);
+  expect(unchanged.body.skills).toMatchObject(catalogSkills);
+  expect(unchanged.body.customSkills).toEqual([]);
+});
+
 test('PUT /api/profile/interests replaces the interest set', async () => {
   const res = await request(createApp())
     .put('/api/profile/interests')
