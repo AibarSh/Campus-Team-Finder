@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { teamApi } from '../services/api';
 import { displayName } from '../lib/names';
+import { hasVacancies, isRoleFull, roleAvailabilityStatus, spotsRemaining } from '../lib/teamAvailability';
+import { useFocusRefresh } from '../lib/useFocusRefresh';
 import StatusBadge from '../components/StatusBadge';
 import { ErrorBox, Spinner } from '../components/Feedback';
 
@@ -25,25 +27,34 @@ export default function TeamDetailsPage() {
   const [error, setError] = useState('');
   const [busyRoleId, setBusyRoleId] = useState(null);
   const [roleErrors, setRoleErrors] = useState({});
+  const refresh = useFocusRefresh();
 
   useEffect(() => {
+    let active = true;
     Promise.all([teamApi.getTeamById(id), teamApi.getMyApplications(), teamApi.getMyApplications('INVITATION')])
       .then(([t, a, i]) => {
+        if (!active) return;
         setTeam(t);
         setMyApplications(a);
         setMyInvitations(i);
+        setError('');
       })
-      .catch((err) => setError(err.message));
-  }, [id]);
+      .catch((err) => { if (active) setError(err.message); });
+    return () => { active = false; };
+  }, [id, refresh]);
 
   const apply = async (openRole) => {
     setBusyRoleId(openRole.id);
     setRoleErrors((prev) => ({ ...prev, [openRole.id]: '' }));
     try {
       const application = await teamApi.applyToRole(team.id, openRole.id);
-      setMyApplications((prev) => [...prev, application]);
+      setMyApplications((prev) => [...prev.filter((item) => item.id !== application.id), application]);
     } catch (err) {
       setRoleErrors((prev) => ({ ...prev, [openRole.id]: err.message }));
+      if (err.status === 409) {
+        const latest = await teamApi.getTeamById(team.id).catch(() => null);
+        if (latest) setTeam(latest);
+      }
     } finally {
       setBusyRoleId(null);
     }
@@ -70,7 +81,9 @@ export default function TeamDetailsPage() {
 
   const totalSlots = team.openRoles.reduce((n, r) => n + r.slotsTotal, 0);
   const filledSlots = team.openRoles.reduce((n, r) => n + r.slotsFilled, 0);
-  const spotsOpen = totalSlots - filledSlots;
+  const spotsOpen = team.openRoles.reduce((n, role) => n + spotsRemaining(role, team.status), 0);
+  const availableRoles = team.openRoles.filter((role) => hasVacancies(role, team.status)).length;
+  const capacityStatus = team.openRoles.every(isRoleFull) ? 'FULL' : 'RECRUITMENT_CLOSED';
   const creatorName = displayName(team.creator);
 
   return (
@@ -119,7 +132,9 @@ export default function TeamDetailsPage() {
                   {team.eventTarget}
                 </span>
               )}
-              {team.status !== 'PUBLISHED' && <StatusBadge status={team.status} />}
+              {team.status === 'DRAFT' && <StatusBadge status="DRAFT" />}
+              {team.status === 'CLOSED' && <StatusBadge status="RECRUITMENT_CLOSED" />}
+              {team.status === 'PUBLISHED' && spotsOpen === 0 && <StatusBadge status={capacityStatus} />}
             </div>
             <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
               <h1 className="text-slate-900 text-2xl sm:text-3xl font-bold mb-1" style={heading}>
@@ -138,10 +153,10 @@ export default function TeamDetailsPage() {
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-4 text-sm text-slate-500">
               <div>
-                <span className="font-semibold text-slate-800">{team.openRoles.length}</span> open roles
+                <span className="font-semibold text-slate-800">{availableRoles}</span> open {availableRoles === 1 ? 'role' : 'roles'}
               </div>
               <div>
-                <span className="font-semibold text-slate-800">{spotsOpen}</span> spots left
+                <span className="font-semibold text-slate-800">{spotsOpen}</span> {spotsOpen === 1 ? 'spot' : 'spots'} left
               </div>
               <div>
                 Created by <span className="font-semibold text-slate-800">{creatorName}</span>
@@ -157,14 +172,14 @@ export default function TeamDetailsPage() {
         <section className="lg:col-span-2 space-y-4">
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-4">
             <h2 className="text-slate-900 font-bold" style={heading}>
-              Open Positions
+              Positions
               <span className="ml-2 text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                {team.openRoles.length} {team.openRoles.length === 1 ? 'role' : 'roles'}
+                {availableRoles} open
               </span>
             </h2>
 
             {team.openRoles.length === 0 && <p className="text-sm text-slate-500">This team has no open roles yet.</p>}
-            {!isOwner && team.status !== 'PUBLISHED' && (
+            {!isOwner && team.status === 'DRAFT' && (
               <p className="text-sm text-slate-500">This team is not accepting applications yet.</p>
             )}
 
@@ -174,7 +189,7 @@ export default function TeamDetailsPage() {
                 const status = entry?.status;
                 const isPendingInvitation =
                   entry?.direction === 'INVITATION' && (status === 'SENT' || status === 'VIEWED');
-                const full = openRole.slotsFilled >= openRole.slotsTotal;
+                const availability = roleAvailabilityStatus(openRole, team.status);
                 const pct = openRole.slotsTotal ? (openRole.slotsFilled / openRole.slotsTotal) * 100 : 0;
 
                 return (
@@ -200,26 +215,20 @@ export default function TeamDetailsPage() {
                         </div>
                       </div>
 
-                      {!isOwner && (
+                      {(availability || !isOwner) && (
                         <div className="flex flex-col items-start gap-1 sm:items-end sm:shrink-0">
-                          {status ? (
-                            <StatusBadge status={status} />
-                          ) : team.status === 'PUBLISHED' ? (
-                            full ? (
-                              <span className="px-3 py-1.5 bg-slate-100 text-slate-400 text-xs font-semibold rounded-lg">
-                                Full
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={busyRoleId === openRole.id}
-                                onClick={() => apply(openRole)}
-                                className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
-                              >
-                                {busyRoleId === openRole.id ? 'Applying...' : 'Apply for Role'}
-                              </button>
-                            )
-                          ) : null}
+                          {availability && <StatusBadge status={availability} />}
+                          {status && <StatusBadge status={status} />}
+                          {!isOwner && !status && !availability && team.status === 'PUBLISHED' && (
+                            <button
+                              type="button"
+                              disabled={busyRoleId === openRole.id}
+                              onClick={() => apply(openRole)}
+                              className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+                            >
+                              {busyRoleId === openRole.id ? 'Applying...' : 'Apply for Role'}
+                            </button>
+                          )}
                           {isPendingInvitation && (
                             <Link to="/applications" className="text-xs font-semibold text-blue-600 hover:underline">
                               Respond in My Applications
@@ -228,6 +237,11 @@ export default function TeamDetailsPage() {
                         </div>
                       )}
                     </div>
+                    {openRole.requiredSkills?.length > 0 && (
+                      <p className="text-xs text-slate-500 wrap-anywhere">
+                        Required Skills · {openRole.requiredSkills.map(({ name }) => name).join(', ')}
+                      </p>
+                    )}
                     {roleErrors[openRole.id] && <p className="text-xs text-red-500">{roleErrors[openRole.id]}</p>}
                   </div>
                 );
@@ -265,8 +279,8 @@ export default function TeamDetailsPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-2">
-              {spotsOpen} {spotsOpen === 1 ? 'spot' : 'spots'} still open across {team.openRoles.length}{' '}
-              {team.openRoles.length === 1 ? 'role' : 'roles'}.
+              {spotsOpen} {spotsOpen === 1 ? 'spot' : 'spots'} still open across {availableRoles}{' '}
+              {availableRoles === 1 ? 'role' : 'roles'}.
             </p>
           </div>
         </aside>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { lookupApi, teamApi, teamManagementApi } from '../services/api';
 import { ErrorBox, Spinner } from '../components/Feedback';
+import RequiredSkillsInput from '../components/RequiredSkillsInput';
 
 const heading = { fontFamily: 'Outfit, sans-serif' };
 
@@ -17,6 +18,7 @@ const inputClass = `${fieldClass} h-10 px-4`;
 const roleRowClass = 'grid grid-cols-[minmax(0,1fr)_3.75rem_2rem] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_6rem_2rem] sm:gap-3';
 const textareaClass = `${fieldClass} px-4 py-3 min-h-28 resize-none`;
 const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5';
+const newRole = () => ({ key: crypto.randomUUID(), roleId: '', slotsTotal: 1, requiredSkills: [] });
 
 // Remounts the wizard whenever the resumed draft id changes (e.g. navigating from
 // /teams/new?team=X to a fresh /teams/new), instead of keeping stale step/state around.
@@ -33,13 +35,19 @@ export default function CreateTeamWizard() {
   const [step, setStep] = useState(resumeId ? 2 : 1);
   const [team, setTeam] = useState(null);
   const [info, setInfo] = useState({ name: '', eventTarget: '', description: '' });
-  const [rows, setRows] = useState([{ roleId: '', slotsTotal: 1 }]);
+  const [rows, setRows] = useState(() => [newRole()]);
   const [roleOptions, setRoleOptions] = useState([]);
+  const [skillCatalog, setSkillCatalog] = useState({ loading: true, options: [] });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     lookupApi.getRoles().then(setRoleOptions).catch((err) => setError(err.message));
+    let active = true;
+    lookupApi.getSkills()
+      .then((options) => { if (active) setSkillCatalog({ options }); })
+      .catch(() => { if (active) setSkillCatalog({ options: [], error: true }); });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -54,7 +62,12 @@ export default function CreateTeamWizard() {
         setTeam(t);
         setInfo({ name: t.name, eventTarget: t.eventTarget || '', description: t.description || '' });
         if (t.openRoles.length > 0) {
-          setRows(t.openRoles.map((r) => ({ roleId: r.roleId, slotsTotal: r.slotsTotal })));
+          setRows(t.openRoles.map((r) => ({
+            key: r.id,
+            roleId: r.roleId,
+            slotsTotal: r.slotsTotal,
+            requiredSkills: (r.requiredSkills ?? []).map(({ name }) => name),
+          })));
         }
       })
       .catch((err) => setError(err.message));
@@ -103,7 +116,10 @@ export default function CreateTeamWizard() {
     if (new Set(chosen.map((r) => r.roleId)).size !== chosen.length) return setError('Each role can only be added once');
     if (chosen.some((r) => !Number.isInteger(r.slotsTotal) || r.slotsTotal < 1)) return setError('Slots must be at least 1');
     run(async () => {
-      const saved = await teamManagementApi.setOpenRoles(team.id, chosen);
+      const saved = await teamManagementApi.setOpenRoles(
+        team.id,
+        chosen.map(({ roleId, slotsTotal, requiredSkills }) => ({ roleId, slotsTotal, requiredSkills })),
+      );
       setTeam((t) => ({ ...t, openRoles: saved }));
       setStep(3);
     });
@@ -214,44 +230,51 @@ export default function CreateTeamWizard() {
                 <span>Slots</span>
               </div>
               {rows.map((row, index) => (
-                <div key={index} className={roleRowClass}>
-                  <select
-                    className={inputClass}
-                    value={row.roleId}
-                    onChange={(e) => updateRow(index, { roleId: e.target.value })}
-                    aria-label="Role"
-                  >
-                    <option value="">Select a role</option>
-                    {roleOptions.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min="1"
-                    className={`${fieldClass} h-10 min-w-0 px-2 sm:px-4`}
-                    value={row.slotsTotal}
-                    onChange={(e) => updateRow(index, { slotsTotal: parseInt(e.target.value, 10) || 0 })}
-                    aria-label="Slots"
+                <div key={row.key} className="space-y-3 border-t border-slate-100 pt-3">
+                  <div className={roleRowClass}>
+                    <select
+                      className={`${fieldClass} h-10 min-w-0 px-2 sm:px-4`}
+                      value={row.roleId}
+                      onChange={(e) => updateRow(index, { roleId: e.target.value })}
+                      aria-label="Role"
+                    >
+                      <option value="">Select a role</option>
+                      {roleOptions.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      className={`${fieldClass} h-10 min-w-0 px-2 sm:px-4`}
+                      value={row.slotsTotal}
+                      onChange={(e) => updateRow(index, { slotsTotal: parseInt(e.target.value, 10) || 0 })}
+                      aria-label="Slots"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
+                      disabled={rows.length === 1}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:hover:text-slate-300 disabled:hover:bg-transparent"
+                      aria-label="Remove role"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <RequiredSkillsInput
+                    skills={row.requiredSkills}
+                    onChange={(requiredSkills) => updateRow(index, { requiredSkills })}
+                    catalog={skillCatalog}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
-                    disabled={rows.length === 1}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-slate-50 transition-colors disabled:opacity-30 disabled:hover:text-slate-300 disabled:hover:bg-transparent"
-                    aria-label="Remove role"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
               ))}
               <button
                 type="button"
-                onClick={() => setRows((prev) => [...prev, { roleId: '', slotsTotal: 1 }])}
+                onClick={() => setRows((prev) => [...prev, newRole()])}
                 className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
               >
                 + Add role
@@ -280,9 +303,12 @@ export default function CreateTeamWizard() {
                   {team.openRoles.map((r) => (
                     <span
                       key={r.id}
-                      className="text-xs px-3 py-1 bg-blue-50 text-blue-700 rounded-full font-medium"
+                      className="max-w-full wrap-anywhere text-xs px-3 py-1 bg-blue-50 text-blue-700 rounded-xl font-medium"
                     >
                       {r.role.name} · {r.slotsTotal} {r.slotsTotal === 1 ? 'slot' : 'slots'}
+                      {r.requiredSkills?.length > 0 && (
+                        <span className="mt-0.5 block">{r.requiredSkills.map(({ name }) => name).join(', ')}</span>
+                      )}
                     </span>
                   ))}
                 </div>

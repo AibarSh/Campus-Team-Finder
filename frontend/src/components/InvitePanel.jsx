@@ -1,48 +1,67 @@
 import { useEffect, useState } from 'react';
-import { teamManagementApi, userApi } from '../services/api';
+import { teamManagementApi } from '../services/api';
 import { displayName } from '../lib/names';
+import { hasVacancies } from '../lib/teamAvailability';
 
-export default function InvitePanel({ team, onInvited }) {
+export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState(null);
-  const [searchError, setSearchError] = useState('');
-  const [roleByUser, setRoleByUser] = useState({});
+  const [selection, setSelection] = useState({ roleId: '', page: 1 });
+  const [search, setSearch] = useState(null);
   const [busyUserId, setBusyUserId] = useState(null);
-  const [rowErrors, setRowErrors] = useState({});
+  const [inviteError, setInviteError] = useState('');
+  const openRoles = team.openRoles.filter((role) => hasVacancies(role, team.status));
+  const selectedRole = openRoles.find((role) => role.id === selection.roleId) ?? openRoles[0];
+  const teamId = team.id;
+  const roleId = selectedRole?.id;
+  const requirements = JSON.stringify(selectedRole?.requiredSkills);
+  const page = selection.roleId === roleId ? selection.page : 1;
+  const currentSearch = search?.query === query && search?.page === page
+    && search?.roleId === roleId && search?.requirements === requirements ? search : null;
+  const setPage = (nextPage) => setSelection({ roleId, page: nextPage });
 
   useEffect(() => {
+    if (!roleId) return;
     let cancelled = false;
     const handle = setTimeout(() => {
-      userApi
-        .search(query)
-        .then((users) => {
-          if (cancelled) return;
-          setResults(users);
-          setSearchError('');
+      teamManagementApi
+        .getCandidates(teamId, roleId, query, page)
+        .then(({ users, hasNext }) => {
+          if (!cancelled) setSearch({ query, page, roleId, requirements, users, hasNext });
         })
         .catch((err) => {
-          if (!cancelled) setSearchError(err.message);
+          if (cancelled) return;
+          setSearch({ query, page, roleId, requirements, error: err.message });
+          if (err.status === 409) onAvailabilityChanged();
         });
     }, 300);
     return () => {
       clearTimeout(handle);
       cancelled = true;
     };
-  }, [query]);
+  }, [teamId, roleId, query, page, requirements, onAvailabilityChanged]);
 
-  if (team.openRoles.length === 0) {
-    return <p className="text-sm text-gray-500">Add open roles before inviting people.</p>;
+  const feedback = inviteError && <p role="alert" className="text-xs text-red-600">{inviteError}</p>;
+  if (!selectedRole) {
+    return (
+      <div className="space-y-2">
+        {feedback}
+        <p className="text-sm text-gray-500">
+          {team.status === 'CLOSED' ? 'Recruitment is closed for this team.' : 'No roles are recruiting.'}
+        </p>
+      </div>
+    );
   }
 
   const invite = async (u) => {
-    const teamOpenRoleId = roleByUser[u.id] || team.openRoles[0].id;
+    const teamOpenRole = selectedRole;
     setBusyUserId(u.id);
-    setRowErrors((prev) => ({ ...prev, [u.id]: '' }));
+    setInviteError('');
     try {
-      const invitation = await teamManagementApi.inviteUser(team.id, u.id, teamOpenRoleId);
-      onInvited({ ...invitation, user: u, teamOpenRole: team.openRoles.find((r) => r.id === teamOpenRoleId) });
+      const invitation = await teamManagementApi.inviteUser(team.id, u.id, teamOpenRole.id);
+      onInvited({ ...invitation, user: u, teamOpenRole });
     } catch (err) {
-      setRowErrors((prev) => ({ ...prev, [u.id]: err.message }));
+      setInviteError(err.message);
+      if (err.status === 409) await onAvailabilityChanged();
     } finally {
       setBusyUserId(null);
     }
@@ -50,17 +69,59 @@ export default function InvitePanel({ team, onInvited }) {
 
   return (
     <div className="space-y-3">
+      {feedback}
+      <label className="block text-sm font-medium text-slate-700">
+        Role to invite for
+        <select
+          value={roleId}
+          disabled={busyUserId !== null}
+          onChange={(e) => {
+            setSelection({ roleId: e.target.value, page: 1 });
+            setInviteError('');
+          }}
+          className="mt-1 block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm sm:max-w-xs"
+        >
+          {openRoles.map((role) => (
+            <option key={role.id} value={role.id}>{role.role.name}</option>
+          ))}
+        </select>
+      </label>
       <input
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setPage(1);
+        }}
         placeholder="Search students by name, email or skill..."
         aria-label="Search students"
         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 bg-white"
       />
-      {searchError && <p className="text-xs text-red-600">{searchError}</p>}
-      {results && results.length === 0 && <p className="text-sm text-gray-500">No users found.</p>}
-      {results?.map((u) => (
+      {!currentSearch && <p role="status" className="text-sm text-gray-500">Loading students…</p>}
+      {currentSearch?.error && <p role="alert" className="text-xs text-red-600">{currentSearch.error}</p>}
+      {currentSearch?.users?.length === 0 && <p className="text-sm text-gray-500">No users found.</p>}
+      {(page > 1 || currentSearch?.hasNext) && (
+        <nav aria-label="Candidate pages" className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+          <button
+            type="button"
+            disabled={page === 1 || !currentSearch}
+            onClick={() => setPage(page - 1)}
+            className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span>Page {page}</span>
+          <button
+            type="button"
+            disabled={!currentSearch?.hasNext}
+            onClick={() => setPage(page + 1)}
+            className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </nav>
+      )}
+      {currentSearch?.users?.map((u) => (
         <div key={u.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-2">
           <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center lg:gap-4">
             <div className="min-w-0">
@@ -69,37 +130,27 @@ export default function InvitePanel({ team, onInvited }) {
                 {[u.faculty, u.studyYear].filter(Boolean).join(' · ') || u.email}
               </p>
               <div className="flex flex-wrap gap-1 pt-1">
-                {u.skills.slice(0, 4).map((s) => (
-                  <span key={s.skill.id} className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[11px] font-medium rounded-md">
-                    {s.skill.name}
+                {[...new Set([
+                  ...u.skills.map((entry) => entry.skill.name),
+                  ...u.customSkills.map((entry) => entry.name),
+                ])].slice(0, 4).map((name) => (
+                  <span key={name} className="max-w-full wrap-anywhere px-2 py-0.5 bg-blue-50 text-blue-600 text-[11px] font-medium rounded-md">
+                    {name}
                   </span>
                 ))}
               </div>
             </div>
             <div className="flex max-w-full items-center gap-2 lg:shrink-0">
-              <select
-                value={roleByUser[u.id] || team.openRoles[0].id}
-                onChange={(e) => setRoleByUser((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                aria-label="Role to invite for"
-                className="min-w-0 px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white"
-              >
-                {team.openRoles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.role.name}
-                  </option>
-                ))}
-              </select>
               <button
                 type="button"
-                disabled={busyUserId === u.id}
+                disabled={busyUserId !== null}
                 onClick={() => invite(u)}
                 className="shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
               >
-                Invite
+                {busyUserId === u.id ? 'Inviting…' : 'Invite'}
               </button>
             </div>
           </div>
-          {rowErrors[u.id] && <p className="text-xs text-red-600">{rowErrors[u.id]}</p>}
         </div>
       ))}
     </div>

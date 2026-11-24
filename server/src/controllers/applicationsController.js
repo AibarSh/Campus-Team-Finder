@@ -44,16 +44,20 @@ async function respondToApplication(req, res, next) {
       }
 
       if (status === 'ACCEPTED') {
-        const role = await tx.teamOpenRole.findUnique({ where: { id: application.teamOpenRoleId } });
         const claim = await tx.teamOpenRole.updateMany({
-          where: { id: role.id, slotsFilled: { lt: role.slotsTotal } },
+          where: { id: application.teamOpenRoleId, slotsFilled: { lt: tx.teamOpenRole.fields.slotsTotal } },
           data: { slotsFilled: { increment: 1 } },
         });
         if (claim.count === 0) {
           throw new AppError(409, 'This role has no open slots left');
         }
       }
-      return tx.application.update({ where: { id: application.id }, data: { status } });
+      const decision = await tx.application.updateMany({
+        where: { id: application.id, status: { in: ['SENT', 'VIEWED'] } },
+        data: { status },
+      });
+      if (!decision.count) throw new AppError(409, 'This application has already been decided');
+      return { ...current, status };
     });
 
     res.json(updated);

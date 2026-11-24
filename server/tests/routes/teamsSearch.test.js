@@ -63,6 +63,17 @@ test('filters by skill (matches open role name)', async () => {
   expect(res.body.map((t) => t.name)).toEqual(['Published ISE Frontend Team']);
 });
 
+test('the role filter checks availability on the matching role', async () => {
+  const role = await prisma.teamOpenRole.findFirstOrThrow({ where: { roleId: backendRole.id, team: { status: 'PUBLISHED' } } });
+  await prisma.teamOpenRole.update({ where: { id: role.id }, data: { slotsFilled: role.slotsTotal } });
+  await prisma.teamOpenRole.create({ data: { teamId: role.teamId, roleId: frontendRole.id, slotsTotal: 1 } });
+  const api = request(createApp());
+  const backend = await api.get('/api/teams?skill=backend').set('Cookie', [cookie]);
+  expect(backend.body).toEqual([]);
+  const frontend = await api.get('/api/teams?skill=frontend').set('Cookie', [cookie]);
+  expect(frontend.body.map((team) => team.id)).toContain(role.teamId);
+});
+
 test('matches a partial name or description and combines the text with the role filter', async () => {
   const search = (q, skill) => request(createApp()).get('/api/teams').set('Cookie', [cookie]).query({ q, ...(skill ? { skill } : {}) });
 

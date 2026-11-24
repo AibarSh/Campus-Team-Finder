@@ -3,10 +3,13 @@ import { Link, useParams } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { teamApi, teamManagementApi } from '../services/api';
 import { displayName, initials } from '../lib/names';
+import { hasVacancies, roleAvailabilityStatus } from '../lib/teamAvailability';
+import { statusLabel } from '../lib/statusLabel';
 import Tabs from '../components/Tabs';
 import StatusBadge from '../components/StatusBadge';
 import DecisionButtons from '../components/DecisionButtons';
 import InvitePanel from '../components/InvitePanel';
+import EditTeamForm from '../components/EditTeamForm';
 import { ErrorBox, Spinner } from '../components/Feedback';
 
 const heading = { fontFamily: 'Outfit, sans-serif' };
@@ -53,10 +56,16 @@ export default function ManageTeamPage() {
   const { user } = useContext(UserContext);
   const [team, setTeam] = useState(null);
   const [tab, setTab] = useState('APPLICATION');
-  const [items, setItems] = useState(null);
+  const [list, setList] = useState(null);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [rowErrors, setRowErrors] = useState({});
+  const [editing, setEditing] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [closing, setClosing] = useState(null);
+  const [closingBusy, setClosingBusy] = useState(false);
+  const [closingError, setClosingError] = useState('');
+  const items = list?.tab === tab ? list.items : null;
 
   const loadTeam = useCallback(
     () => teamApi.getTeamById(id).then(setTeam).catch((err) => setError(err.message)),
@@ -73,7 +82,7 @@ export default function ManageTeamPage() {
     let cancelled = false;
     teamManagementApi
       .getTeamApplications(id, tab)
-      .then((data) => !cancelled && setItems(data))
+      .then((data) => !cancelled && setList({ tab, items: data }))
       .catch((err) => !cancelled && setError(err.message));
     return () => {
       cancelled = true;
@@ -81,9 +90,39 @@ export default function ManageTeamPage() {
   }, [id, tab, isOwner]);
 
   const switchTab = (next) => {
+    if (next === tab) return;
     setTab(next);
-    setItems(null);
+    setList(null);
     setError('');
+  };
+
+  const refreshInvitations = useCallback(() => Promise.all([
+    loadTeam(),
+    teamManagementApi.getTeamApplications(id, 'INVITATION')
+      .then((items) => setList((prev) => prev?.tab === 'INVITATION' ? { ...prev, items } : prev))
+      .catch((err) => setError(err.message)),
+  ]), [id, loadTeam]);
+
+  const closeRecruitment = async () => {
+    setClosingBusy(true);
+    setClosingError('');
+    try {
+      const updated = await teamManagementApi.closeRecruitment(id, closing.role?.id);
+      setTeam(updated);
+      setNotice(closing.role ? `Recruitment closed for ${closing.role.role.name}.` : 'Team recruitment closed.');
+      setClosing(null);
+    } catch (err) {
+      setClosingError(err.message);
+      if (err.status === 409) await loadTeam();
+    } finally {
+      setClosingBusy(false);
+    }
+  };
+
+  const prepareClose = (role) => {
+    setClosingError('');
+    setNotice('');
+    setClosing({ role });
   };
 
   const respond = async (item, status) => {
@@ -91,7 +130,9 @@ export default function ManageTeamPage() {
     setRowErrors((prev) => ({ ...prev, [item.id]: '' }));
     try {
       const updated = await teamManagementApi.respondToApplication(item.id, status);
-      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: updated.status } : i)));
+      setList((prev) => prev?.tab === 'APPLICATION'
+        ? { ...prev, items: prev.items.map((i) => (i.id === item.id ? { ...i, status: updated.status } : i)) }
+        : prev);
       if (status === 'ACCEPTED') loadTeam();
     } catch (err) {
       setRowErrors((prev) => ({ ...prev, [item.id]: err.message }));
@@ -136,18 +177,27 @@ export default function ManageTeamPage() {
               {team.name}
             </h1>
             <div className="flex flex-wrap gap-1 pt-2">
-              {team.openRoles.map((r) => (
-                <span
-                  key={r.id}
-                  className="text-xs px-2.5 py-1 bg-white text-slate-600 rounded-full border border-slate-200 font-medium"
-                >
-                  {r.role.name} · {r.slotsFilled}/{r.slotsTotal}
-                </span>
-              ))}
+              {team.openRoles.map((r) => {
+                const status = roleAvailabilityStatus(r, team.status);
+                return (
+                  <span key={r.id} className="max-w-full wrap-anywhere text-xs px-2.5 py-1 bg-white text-slate-600 rounded-full border border-slate-200 font-medium">
+                    {r.role.name} · {r.slotsFilled}/{r.slotsTotal}{status && ` · ${statusLabel(status)}`}
+                  </span>
+                );
+              })}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
-            <StatusBadge status={team.status} />
+            <StatusBadge status={team.status === 'CLOSED' ? 'RECRUITMENT_CLOSED' : team.status} />
+            {team.status === 'PUBLISHED' && !editing && !closing && (
+              <button
+                type="button"
+                onClick={() => { setEditing(true); setNotice(''); }}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Edit Team
+              </button>
+            )}
             <Link
               to={`/teams/${team.id}`}
               className="px-4 py-2 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
@@ -166,21 +216,55 @@ export default function ManageTeamPage() {
           </div>
         )}
 
+        {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
+        {editing && team.status === 'PUBLISHED' && (
+          <EditTeamForm
+            team={team}
+            onCancel={() => setEditing(false)}
+            onSaved={(saved) => {
+              setTeam(saved);
+              setEditing(false);
+              setNotice('Team updated.');
+            }}
+          />
+        )}
+
+        {team.status === 'PUBLISHED' && !editing && (
+          <details open={closing ? true : undefined} className="rounded-2xl border border-slate-100 bg-white p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-900">Recruitment controls</summary>
+            {closing ? (
+              <div className="mt-3 space-y-3">
+                <p className="text-sm text-slate-700">
+                  {closing.role ? `Close recruitment for ${closing.role.role.name}?` : 'Close recruitment for the whole team?'}
+                  {' '}Existing applications and invitations can still be decided.
+                </p>
+                <ErrorBox message={closingError} />
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={closeRecruitment} disabled={closingBusy} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    Confirm closure
+                  </button>
+                  <button type="button" onClick={() => setClosing(null)} disabled={closingBusy} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {team.openRoles.filter((role) => hasVacancies(role, team.status)).map((role) => (
+                  <button key={role.id} type="button" onClick={() => prepareClose(role)} className="max-w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 wrap-anywhere">
+                    Close recruitment for {role.role.name}
+                  </button>
+                ))}
+                <button type="button" onClick={() => prepareClose(null)} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
+                  Close team recruitment
+                </button>
+              </div>
+            )}
+          </details>
+        )}
+
         <Tabs tabs={TABS} active={tab} onChange={switchTab} />
         <ErrorBox message={error} />
-
-        {tab === 'INVITATION' && (
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-3">
-            <h2 className="text-slate-900 font-bold text-sm" style={heading}>
-              Invite students
-            </h2>
-            {team.status === 'DRAFT' ? (
-              <p className="text-sm text-slate-500">Publish the team before inviting people.</p>
-            ) : (
-              <InvitePanel team={team} onInvited={(invitation) => setItems((prev) => [invitation, ...(prev || [])])} />
-            )}
-          </section>
-        )}
 
         <section className="space-y-3">
           {tab === 'INVITATION' && (
@@ -233,6 +317,24 @@ export default function ManageTeamPage() {
             </div>
           ))}
         </section>
+        {tab === 'INVITATION' && items && (
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-3">
+            <h2 className="text-slate-900 font-bold text-sm" style={heading}>
+              Invite students
+            </h2>
+            {team.status === 'DRAFT' ? (
+              <p className="text-sm text-slate-500">Publish the team before inviting people.</p>
+            ) : (
+              <InvitePanel
+                team={team}
+                onAvailabilityChanged={refreshInvitations}
+                onInvited={(invitation) => setList((prev) => prev?.tab === 'INVITATION'
+                  ? { ...prev, items: [invitation, ...prev.items] }
+                  : prev)}
+              />
+            )}
+          </section>
+        )}
       </div>
     </main>
   );

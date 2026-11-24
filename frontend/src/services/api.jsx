@@ -21,7 +21,9 @@ async function apiFetch(endpoint, options = {}) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
+    const error = new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   // Return empty object for 204 No Content
@@ -105,6 +107,7 @@ export const teamApi = {
   },
 
   getTeamById: (id) => apiFetch(`/api/teams/${id}`),
+  getRecommendations: () => apiFetch('/api/teams/recommended'),
 
   applyToRole: (teamId, roleId) =>
     apiFetch(`/api/teams/${teamId}/roles/${roleId}/apply`, {
@@ -132,13 +135,16 @@ export const teamManagementApi = {
   setOpenRoles: (teamId, roles) =>
     apiFetch(`/api/teams/${teamId}/roles`, {
       method: 'PUT',
-      body: JSON.stringify({ roles }), // [{ roleId, slotsTotal }]
+      body: JSON.stringify({ roles }),
     }),
 
   publishTeam: (teamId) =>
     apiFetch(`/api/teams/${teamId}/publish`, {
       method: 'POST',
     }),
+
+  closeRecruitment: (teamId, roleId) =>
+    apiFetch(`/api/teams/${teamId}${roleId ? `/roles/${roleId}` : ''}/close-recruitment`, { method: 'POST' }),
 
   getTeamApplications: (teamId, direction) =>
     apiFetch(`/api/teams/${teamId}/applications${direction === 'INVITATION' ? '?direction=INVITATION' : ''}`),
@@ -156,9 +162,7 @@ export const teamManagementApi = {
     }),
 
   getMyCreatedTeams: () => apiFetch('/api/teams/mine'),
-};
 
-// Flow 4.5B — find users to invite
-export const userApi = {
-  search: (q) => apiFetch(`/api/users?q=${encodeURIComponent(q)}`),
+  getCandidates: (teamId, roleId, q, page) =>
+    apiFetch(`/api/teams/${teamId}/roles/${roleId}/candidates?${new URLSearchParams({ q, page })}`),
 };

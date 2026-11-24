@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { teamApi } from '../services/api';
+import { useFocusRefresh } from '../lib/useFocusRefresh';
 import TeamCard from '../components/TeamCard';
 import UserProfileSidebar from '../components/UserProfileSidebar';
 
@@ -29,11 +30,12 @@ function StatTile({ value, label, hint, emoji, iconBg, hintColor }) {
 
 export default function DashboardPage() {
   const { user } = useContext(UserContext);
-  const [teams, setTeams] = useState([]);
+  const [recommendations, setRecommendations] = useState(null);
   const [applications, setApplications] = useState([]);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const refresh = useFocusRefresh();
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -42,16 +44,18 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    Promise.all([teamApi.getTeams(), teamApi.getMyApplications()])
+    let active = true;
+    Promise.all([teamApi.getRecommendations(), teamApi.getMyApplications()])
       .then(([t, a]) => {
-        setTeams(t);
+        if (!active) return;
+        setRecommendations(t);
         setApplications(a);
+        setError('');
       })
-      .catch((err) => setError(err.message));
-  }, []);
+      .catch((err) => { if (active) setError(err.message); });
+    return () => { active = false; };
+  }, [refresh]);
 
-  // Your own teams are not a recommendation.
-  const recommended = teams.filter((t) => t.creatorId !== user?.id);
   const activeCount = applications.filter((a) => a.status === 'SENT' || a.status === 'VIEWED').length;
   const joinedCount = applications.filter((a) => a.status === 'ACCEPTED').length;
 
@@ -124,17 +128,18 @@ export default function DashboardPage() {
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-slate-900 font-bold" style={heading}>
-              Recommended for you
+              {recommendations?.personalized ? 'Recommended for you' : 'Open teams'}
             </h2>
-            {recommended.length > 2 && (
+            {recommendations?.teams.length > 0 && (
               <Link to="/browse" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                See all {teams.length} teams
+                Browse teams
               </Link>
             )}
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
-          {!error && recommended.length === 0 && (
+          {!error && !recommendations && <p role="status" className="text-sm text-slate-500">Loading teams…</p>}
+          {!error && recommendations?.teams.length === 0 && (
             <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
               <div className="text-4xl mb-3">🔍</div>
               <div className="text-slate-700 font-semibold mb-1">No open teams yet</div>
@@ -143,7 +148,7 @@ export default function DashboardPage() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {recommended.slice(0, 2).map((team) => (
+            {recommendations?.teams.map((team) => (
               <TeamCard key={team.id} team={team} />
             ))}
           </div>

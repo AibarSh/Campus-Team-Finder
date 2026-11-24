@@ -51,6 +51,17 @@ test('rejects a duplicate application to the same role', async () => {
   expect(res.status).toBe(409);
 });
 
+test('rejects an application after the student declined their invitation to the same vacant role', async () => {
+  await prisma.application.create({
+    data: { teamId: team.id, teamOpenRoleId: teamOpenRole.id, userId: applicant.id, direction: 'INVITATION', status: 'DECLINED' },
+  });
+  const res = await request(createApp())
+    .post(`/api/teams/${team.id}/roles/${teamOpenRole.id}/apply`).set('Cookie', [applicantCookie]);
+  expect(res.status).toBe(409);
+  expect(res.body.error).toBe('You already declined an invitation to this role');
+  expect(await prisma.application.count({ where: { direction: 'APPLICATION' } })).toBe(0);
+});
+
 test('404s when the role does not belong to the team', async () => {
   const otherTeam = await prisma.team.create({ data: { name: 'Team B', creatorId: applicant.id } });
   const res = await request(createApp())

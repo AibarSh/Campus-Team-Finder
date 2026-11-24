@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { lookupApi, teamApi } from '../services/api';
+import { useFocusRefresh } from '../lib/useFocusRefresh';
 import TeamCard from '../components/TeamCard';
 
 const heading = { fontFamily: 'Outfit, sans-serif' };
@@ -9,6 +10,7 @@ export default function BrowseTeamsPage() {
   const [result, setResult] = useState(null);
   const [roles, setRoles] = useState([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const refresh = useFocusRefresh();
   const query = searchParams.get('q') || '';
   const q = query.trim();
   const role = searchParams.get('role') || '';
@@ -40,7 +42,7 @@ export default function BrowseTeamsPage() {
       active = false;
       clearTimeout(timer);
     };
-  }, [q, role]);
+  }, [q, role, refresh]);
 
   const loading = result?.q !== q || result?.role !== role;
   const teams = loading ? [] : result.teams ?? [];
