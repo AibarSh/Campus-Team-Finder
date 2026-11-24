@@ -63,7 +63,7 @@ test('only the creator can set open roles, and publish requires at least one rol
   expect(publish.body.status).toBe('PUBLISHED');
 });
 
-test('PUT /:id/roles preserves existing Application rows and slotsFilled for unchanged roles', async () => {
+test('editing a published team preserves role IDs, members and application history', async () => {
   const frontendRole = await prisma.role.create({ data: { name: 'Frontend' } });
   const team = await prisma.team.create({ data: { name: 'Hack Squad', creatorId: owner.id } });
 
@@ -97,16 +97,26 @@ test('PUT /:id/roles preserves existing Application rows and slotsFilled for unc
   expect(acceptRes.status).toBe(200);
 
   const newRole = await prisma.role.create({ data: { name: 'Design' } });
-  const secondSet = await request(createApp())
+  const legacy = await request(createApp())
     .put(`/api/teams/${team.id}/roles`)
     .set('Cookie', [ownerCookie])
+    .send({ roles: [{ roleId: newRole.id, slotsTotal: 1 }] });
+  expect(legacy.status).toBe(409);
+
+  const secondSet = await request(createApp())
+    .patch(`/api/teams/${team.id}`)
+    .set('Cookie', [ownerCookie])
     .send({
+      description: 'Updated description',
+      eventTarget: 'Updated event',
       roles: [
-        { roleId: backendRole.id, slotsTotal: 3 },
+        { roleId: backendRole.id, slotsTotal: 3, requiredSkills: ['Python'] },
         { roleId: newRole.id, slotsTotal: 1 },
       ],
     });
   expect(secondSet.status).toBe(200);
+  expect(secondSet.body).toMatchObject({ name: team.name, description: 'Updated description', eventTarget: 'Updated event' });
+  expect(secondSet.body.openRoles).toHaveLength(3);
 
   const applicationsAfter = await prisma.application.findMany({ where: { teamId: team.id } });
   expect(applicationsAfter).toHaveLength(1);
@@ -118,7 +128,27 @@ test('PUT /:id/roles preserves existing Application rows and slotsFilled for unc
   expect(backendAfter.slotsTotal).toBe(3);
 
   const frontendAfter = await prisma.teamOpenRole.findFirst({ where: { teamId: team.id, roleId: frontendRole.id } });
-  expect(frontendAfter).toBeNull();
+  expect(frontendAfter).not.toBeNull();
+  expect(secondSet.body.openRoles.find(({ id }) => id === backendOpenRole.id).requiredSkills)
+    .toMatchObject([{ name: 'Python' }]);
+});
+
+test('rejects a published rename, editing a full role, or reducing slots below current members', async () => {
+  const otherRole = await prisma.role.create({ data: { name: 'Other' } });
+  const team = await prisma.team.create({ data: {
+    name: 'Fixed title', creatorId: owner.id, status: 'PUBLISHED',
+    openRoles: { create: [
+      { roleId: backendRole.id, slotsTotal: 3, slotsFilled: 2 },
+      { roleId: otherRole.id, slotsTotal: 1, slotsFilled: 1 },
+    ] },
+  } });
+  const edit = (data) => request(createApp()).patch(`/api/teams/${team.id}`).set('Cookie', [ownerCookie]).send(data);
+  expect((await edit({ name: 'New' })).status).toBe(409);
+  expect((await edit({ roles: [{ roleId: backendRole.id, slotsTotal: 1 }] })).status).toBe(409);
+  expect((await edit({ roles: [{ roleId: otherRole.id, slotsTotal: 2 }] })).status).toBe(409);
+  expect((await edit({ description: 'No change', roles: [{ roleId: otherRole.id, slotsTotal: 1, requiredSkills: ['Java'] }] })).status).toBe(409);
+  expect((await prisma.team.findUnique({ where: { id: team.id } })).description).toBeNull();
+  expect((await edit({ roles: [{ roleId: backendRole.id, slotsTotal: 2 }] })).status).toBe(200);
 });
 
 test('GET /api/teams/mine lists teams created by the current user', async () => {

@@ -231,6 +231,11 @@ export default function TeamDetailsPage() {
                         </div>
                       )}
                     </div>
+                    {openRole.requiredSkills?.length > 0 && (
+                      <p className="text-xs text-slate-500 wrap-anywhere">
+                        Required Skills · {openRole.requiredSkills.map(({ name }) => name).join(', ')}
+                      </p>
+                    )}
                     {roleErrors[openRole.id] && <p className="text-xs text-red-500">{roleErrors[openRole.id]}</p>}
                   </div>
                 );

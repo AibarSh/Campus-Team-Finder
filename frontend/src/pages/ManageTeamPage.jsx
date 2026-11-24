@@ -7,6 +7,7 @@ import Tabs from '../components/Tabs';
 import StatusBadge from '../components/StatusBadge';
 import DecisionButtons from '../components/DecisionButtons';
 import InvitePanel from '../components/InvitePanel';
+import EditTeamForm from '../components/EditTeamForm';
 import { ErrorBox, Spinner } from '../components/Feedback';
 
 const heading = { fontFamily: 'Outfit, sans-serif' };
@@ -57,6 +58,8 @@ export default function ManageTeamPage() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [rowErrors, setRowErrors] = useState({});
+  const [editing, setEditing] = useState(false);
+  const [notice, setNotice] = useState('');
   const items = list?.tab === tab ? list.items : null;
 
   const loadTeam = useCallback(
@@ -159,6 +162,15 @@ export default function ManageTeamPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
             <StatusBadge status={team.status} />
+            {team.status === 'PUBLISHED' && !editing && (
+              <button
+                type="button"
+                onClick={() => { setEditing(true); setNotice(''); }}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Edit Team
+              </button>
+            )}
             <Link
               to={`/teams/${team.id}`}
               className="px-4 py-2 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
@@ -175,6 +187,19 @@ export default function ManageTeamPage() {
               Finish setup
             </Link>
           </div>
+        )}
+
+        {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
+        {editing && team.status === 'PUBLISHED' && (
+          <EditTeamForm
+            team={team}
+            onCancel={() => setEditing(false)}
+            onSaved={(saved) => {
+              setTeam(saved);
+              setEditing(false);
+              setNotice('Team updated.');
+            }}
+          />
         )}
 
         <Tabs tabs={TABS} active={tab} onChange={switchTab} />
