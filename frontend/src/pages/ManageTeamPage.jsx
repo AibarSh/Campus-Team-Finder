@@ -88,12 +88,12 @@ export default function ManageTeamPage() {
     setError('');
   };
 
-  const refreshInvitations = () => Promise.all([
+  const refreshInvitations = useCallback(() => Promise.all([
     loadTeam(),
     teamManagementApi.getTeamApplications(id, 'INVITATION')
       .then((items) => setList((prev) => prev?.tab === 'INVITATION' ? { ...prev, items } : prev))
       .catch((err) => setError(err.message)),
-  ]);
+  ]), [id, loadTeam]);
 
   const respond = async (item, status) => {
     setBusyId(item.id);

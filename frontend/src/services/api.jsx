@@ -107,6 +107,7 @@ export const teamApi = {
   },
 
   getTeamById: (id) => apiFetch(`/api/teams/${id}`),
+  getRecommendations: () => apiFetch('/api/teams/recommended'),
 
   applyToRole: (teamId, roleId) =>
     apiFetch(`/api/teams/${teamId}/roles/${roleId}/apply`, {
@@ -158,9 +159,7 @@ export const teamManagementApi = {
     }),
 
   getMyCreatedTeams: () => apiFetch('/api/teams/mine'),
-};
 
-// Flow 4.5B — find users to invite
-export const userApi = {
-  search: (q, page = 1) => apiFetch(`/api/users?${new URLSearchParams({ q, page })}`),
+  getCandidates: (teamId, roleId, q, page) =>
+    apiFetch(`/api/teams/${teamId}/roles/${roleId}/candidates?${new URLSearchParams({ q, page })}`),
 };

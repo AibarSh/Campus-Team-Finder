@@ -1,6 +1,7 @@
 const { prisma } = require('../lib/prisma');
 const { AppError } = require('../errors');
 const { FACULTIES } = require('../lib/profileOptions');
+const { preferredRoleFields, prefersRole } = require('../lib/recruitmentMatching');
 
 async function requireTeamOwner(teamId, userId) {
   const team = await prisma.team.findUnique({ where: { id: teamId } });
@@ -149,6 +150,26 @@ async function getTeam(req, res, next) {
   }
 }
 
+async function recommendTeams(req, res, next) {
+  try {
+    const vacancies = { slotsFilled: { lt: prisma.teamOpenRole.fields.slotsTotal } };
+    const [profile, teams] = await Promise.all([
+      prisma.user.findUniqueOrThrow({ where: { id: req.user.id }, select: preferredRoleFields }),
+      prisma.team.findMany({
+        where: { status: 'PUBLISHED', creatorId: { not: req.user.id }, openRoles: { some: vacancies } },
+        include: { creator: true, openRoles: { include: { role: true } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+    const matches = teams.filter((team) => team.openRoles.some(
+      (role) => role.slotsFilled < role.slotsTotal && prefersRole(profile, role),
+    ));
+    res.json({ personalized: matches.length > 0, teams: (matches.length ? matches : teams).slice(0, 2) });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function requireVacantRole(tx, teamId, roleId) {
   // Serialize the availability check with claims of the same role's seats.
   const [role] = await tx.$queryRaw`
@@ -231,6 +252,7 @@ module.exports = {
   publishTeam,
   listMyTeams,
   listTeams,
+  recommendTeams,
   getTeam,
   applyToRole,
   listTeamApplications,

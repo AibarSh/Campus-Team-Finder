@@ -1,40 +1,45 @@
 import { useEffect, useState } from 'react';
-import { teamManagementApi, userApi } from '../services/api';
+import { teamManagementApi } from '../services/api';
 import { displayName } from '../lib/names';
 import { hasVacancies } from '../lib/teamAvailability';
 
 export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) {
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
+  const [selection, setSelection] = useState({ roleId: '', page: 1 });
   const [search, setSearch] = useState(null);
-  const [roleByUser, setRoleByUser] = useState({});
   const [busyUserId, setBusyUserId] = useState(null);
   const [inviteError, setInviteError] = useState('');
   const openRoles = team.openRoles.filter(hasVacancies);
-  const canInvite = openRoles.length > 0;
-  const currentSearch = search?.query === query && search?.page === page ? search : null;
+  const selectedRole = openRoles.find((role) => role.id === selection.roleId) ?? openRoles[0];
+  const teamId = team.id;
+  const roleId = selectedRole?.id;
+  const page = selection.roleId === roleId ? selection.page : 1;
+  const currentSearch = search?.query === query && search?.page === page && search?.roleId === roleId ? search : null;
+  const setPage = (nextPage) => setSelection({ roleId, page: nextPage });
 
   useEffect(() => {
-    if (!canInvite) return;
+    if (!roleId) return;
     let cancelled = false;
     const handle = setTimeout(() => {
-      userApi
-        .search(query, page)
+      teamManagementApi
+        .getCandidates(teamId, roleId, query, page)
         .then(({ users, hasNext }) => {
-          if (!cancelled) setSearch({ query, page, users, hasNext });
+          if (!cancelled) setSearch({ query, page, roleId, users, hasNext });
         })
         .catch((err) => {
-          if (!cancelled) setSearch({ query, page, error: err.message });
+          if (cancelled) return;
+          setSearch({ query, page, roleId, error: err.message });
+          if (err.status === 409) onAvailabilityChanged();
         });
     }, 300);
     return () => {
       clearTimeout(handle);
       cancelled = true;
     };
-  }, [query, page, canInvite]);
+  }, [teamId, roleId, query, page, onAvailabilityChanged]);
 
   const feedback = inviteError && <p role="alert" className="text-xs text-red-600">{inviteError}</p>;
-  if (!canInvite) {
+  if (!selectedRole) {
     return (
       <div className="space-y-2">
         {feedback}
@@ -43,10 +48,8 @@ export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) 
     );
   }
 
-  const selectedRole = (userId) => openRoles.find((role) => role.id === roleByUser[userId]) ?? openRoles[0];
-
   const invite = async (u) => {
-    const teamOpenRole = selectedRole(u.id);
+    const teamOpenRole = selectedRole;
     setBusyUserId(u.id);
     setInviteError('');
     try {
@@ -63,6 +66,22 @@ export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) 
   return (
     <div className="space-y-3">
       {feedback}
+      <label className="block text-sm font-medium text-slate-700">
+        Role to invite for
+        <select
+          value={roleId}
+          disabled={busyUserId !== null}
+          onChange={(e) => {
+            setSelection({ roleId: e.target.value, page: 1 });
+            setInviteError('');
+          }}
+          className="mt-1 block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm sm:max-w-xs"
+        >
+          {openRoles.map((role) => (
+            <option key={role.id} value={role.id}>{role.role.name}</option>
+          ))}
+        </select>
+      </label>
       <input
         type="text"
         value={query}
@@ -118,18 +137,6 @@ export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) 
               </div>
             </div>
             <div className="flex max-w-full items-center gap-2 lg:shrink-0">
-              <select
-                value={selectedRole(u.id).id}
-                onChange={(e) => setRoleByUser((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                aria-label="Role to invite for"
-                className="min-w-0 px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white"
-              >
-                {openRoles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.role.name}
-                  </option>
-                ))}
-              </select>
               <button
                 type="button"
                 disabled={busyUserId !== null}
