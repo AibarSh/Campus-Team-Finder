@@ -5,34 +5,33 @@ import { hasVacancies } from '../lib/teamAvailability';
 
 export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState(null);
-  const [searchError, setSearchError] = useState('');
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState(null);
   const [roleByUser, setRoleByUser] = useState({});
   const [busyUserId, setBusyUserId] = useState(null);
   const [inviteError, setInviteError] = useState('');
   const openRoles = team.openRoles.filter(hasVacancies);
   const canInvite = openRoles.length > 0;
+  const currentSearch = search?.query === query && search?.page === page ? search : null;
 
   useEffect(() => {
     if (!canInvite) return;
     let cancelled = false;
     const handle = setTimeout(() => {
       userApi
-        .search(query)
-        .then((users) => {
-          if (cancelled) return;
-          setResults(users);
-          setSearchError('');
+        .search(query, page)
+        .then(({ users, hasNext }) => {
+          if (!cancelled) setSearch({ query, page, users, hasNext });
         })
         .catch((err) => {
-          if (!cancelled) setSearchError(err.message);
+          if (!cancelled) setSearch({ query, page, error: err.message });
         });
     }, 300);
     return () => {
       clearTimeout(handle);
       cancelled = true;
     };
-  }, [query, canInvite]);
+  }, [query, page, canInvite]);
 
   const feedback = inviteError && <p role="alert" className="text-xs text-red-600">{inviteError}</p>;
   if (!canInvite) {
@@ -67,14 +66,39 @@ export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) 
       <input
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setPage(1);
+        }}
         placeholder="Search students by name, email or skill..."
         aria-label="Search students"
         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-600 bg-white"
       />
-      {searchError && <p className="text-xs text-red-600">{searchError}</p>}
-      {results && results.length === 0 && <p className="text-sm text-gray-500">No users found.</p>}
-      {results?.map((u) => (
+      {!currentSearch && <p role="status" className="text-sm text-gray-500">Loading students…</p>}
+      {currentSearch?.error && <p role="alert" className="text-xs text-red-600">{currentSearch.error}</p>}
+      {currentSearch?.users?.length === 0 && <p className="text-sm text-gray-500">No users found.</p>}
+      {(page > 1 || currentSearch?.hasNext) && (
+        <nav aria-label="Candidate pages" className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+          <button
+            type="button"
+            disabled={page === 1 || !currentSearch}
+            onClick={() => setPage(page - 1)}
+            className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span>Page {page}</span>
+          <button
+            type="button"
+            disabled={!currentSearch?.hasNext}
+            onClick={() => setPage(page + 1)}
+            className="rounded-lg border border-slate-200 px-3 py-2 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </nav>
+      )}
+      {currentSearch?.users?.map((u) => (
         <div key={u.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-2">
           <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center lg:gap-4">
             <div className="min-w-0">
@@ -83,9 +107,12 @@ export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) 
                 {[u.faculty, u.studyYear].filter(Boolean).join(' · ') || u.email}
               </p>
               <div className="flex flex-wrap gap-1 pt-1">
-                {u.skills.slice(0, 4).map((s) => (
-                  <span key={s.skill.id} className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[11px] font-medium rounded-md">
-                    {s.skill.name}
+                {[...new Set([
+                  ...u.skills.map((entry) => entry.skill.name),
+                  ...u.customSkills.map((entry) => entry.name),
+                ])].slice(0, 4).map((name) => (
+                  <span key={name} className="max-w-full wrap-anywhere px-2 py-0.5 bg-blue-50 text-blue-600 text-[11px] font-medium rounded-md">
+                    {name}
                   </span>
                 ))}
               </div>

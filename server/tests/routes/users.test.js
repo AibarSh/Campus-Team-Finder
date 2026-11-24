@@ -71,3 +71,31 @@ test('does not expose internal fields', async () => {
   expect(res.body[0]).not.toHaveProperty('passwordHash');
   expect(res.body[0]).not.toHaveProperty('profileComplete');
 });
+
+test('paginates all candidates and finds a candidate from page two by custom skill, name or email', async () => {
+  const target = await prisma.user.create({
+    data: {
+      email: 'secondpage@kbtu.kz', name: 'Second Page', profileComplete: true,
+      customSkills: { create: { name: 'Lunar Cartography', normalizedName: 'lunar cartography', proficiency: 'INTERMEDIATE' } },
+    },
+  });
+  await prisma.user.createMany({
+    data: Array.from({ length: 10 }, (_, i) => ({
+      email: `newer-${i}@kbtu.kz`, name: `Candidate ${i}`, profileComplete: true,
+      createdAt: new Date(target.createdAt.getTime() + 1000),
+    })),
+  });
+  const getPage = (page, q = '') => request(createApp()).get('/api/users').query({ page, q }).set('Cookie', [meCookie]);
+  const first = await getPage(1);
+  expect(first.body).toMatchObject({ page: 1, hasNext: true });
+  expect(first.body.users).toHaveLength(10);
+  expect(first.body.users.map((user) => user.id)).not.toContain(target.id);
+  const second = await getPage(2);
+  expect(second.body).toMatchObject({ page: 2, hasNext: false });
+  expect(second.body.users.map((user) => user.id)).toContain(target.id);
+  for (const q of ['  CARTOGRAPHY  ', 'Second Page', 'secondpage@kbtu.kz']) {
+    const filtered = await getPage(1, q);
+    expect(filtered.body.users).toMatchObject([{ id: target.id, customSkills: [{ name: 'Lunar Cartography' }] }]);
+  }
+  expect((await getPage(0)).status).toBe(400);
+});

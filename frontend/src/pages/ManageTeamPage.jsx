@@ -53,10 +53,11 @@ export default function ManageTeamPage() {
   const { user } = useContext(UserContext);
   const [team, setTeam] = useState(null);
   const [tab, setTab] = useState('APPLICATION');
-  const [items, setItems] = useState(null);
+  const [list, setList] = useState(null);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [rowErrors, setRowErrors] = useState({});
+  const items = list?.tab === tab ? list.items : null;
 
   const loadTeam = useCallback(
     () => teamApi.getTeamById(id).then(setTeam).catch((err) => setError(err.message)),
@@ -73,7 +74,7 @@ export default function ManageTeamPage() {
     let cancelled = false;
     teamManagementApi
       .getTeamApplications(id, tab)
-      .then((data) => !cancelled && setItems(data))
+      .then((data) => !cancelled && setList({ tab, items: data }))
       .catch((err) => !cancelled && setError(err.message));
     return () => {
       cancelled = true;
@@ -81,17 +82,27 @@ export default function ManageTeamPage() {
   }, [id, tab, isOwner]);
 
   const switchTab = (next) => {
+    if (next === tab) return;
     setTab(next);
-    setItems(null);
+    setList(null);
     setError('');
   };
+
+  const refreshInvitations = () => Promise.all([
+    loadTeam(),
+    teamManagementApi.getTeamApplications(id, 'INVITATION')
+      .then((items) => setList((prev) => prev?.tab === 'INVITATION' ? { ...prev, items } : prev))
+      .catch((err) => setError(err.message)),
+  ]);
 
   const respond = async (item, status) => {
     setBusyId(item.id);
     setRowErrors((prev) => ({ ...prev, [item.id]: '' }));
     try {
       const updated = await teamManagementApi.respondToApplication(item.id, status);
-      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: updated.status } : i)));
+      setList((prev) => prev?.tab === 'APPLICATION'
+        ? { ...prev, items: prev.items.map((i) => (i.id === item.id ? { ...i, status: updated.status } : i)) }
+        : prev);
       if (status === 'ACCEPTED') loadTeam();
     } catch (err) {
       setRowErrors((prev) => ({ ...prev, [item.id]: err.message }));
@@ -169,23 +180,6 @@ export default function ManageTeamPage() {
         <Tabs tabs={TABS} active={tab} onChange={switchTab} />
         <ErrorBox message={error} />
 
-        {tab === 'INVITATION' && (
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-3">
-            <h2 className="text-slate-900 font-bold text-sm" style={heading}>
-              Invite students
-            </h2>
-            {team.status === 'DRAFT' ? (
-              <p className="text-sm text-slate-500">Publish the team before inviting people.</p>
-            ) : (
-              <InvitePanel
-                team={team}
-                onAvailabilityChanged={loadTeam}
-                onInvited={(invitation) => setItems((prev) => [invitation, ...(prev || [])])}
-              />
-            )}
-          </section>
-        )}
-
         <section className="space-y-3">
           {tab === 'INVITATION' && (
             <h2 className="text-slate-900 font-bold text-sm" style={heading}>
@@ -237,6 +231,24 @@ export default function ManageTeamPage() {
             </div>
           ))}
         </section>
+        {tab === 'INVITATION' && items && (
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-3">
+            <h2 className="text-slate-900 font-bold text-sm" style={heading}>
+              Invite students
+            </h2>
+            {team.status === 'DRAFT' ? (
+              <p className="text-sm text-slate-500">Publish the team before inviting people.</p>
+            ) : (
+              <InvitePanel
+                team={team}
+                onAvailabilityChanged={refreshInvitations}
+                onInvited={(invitation) => setList((prev) => prev?.tab === 'INVITATION'
+                  ? { ...prev, items: [invitation, ...prev.items] }
+                  : prev)}
+              />
+            )}
+          </section>
+        )}
       </div>
     </main>
   );

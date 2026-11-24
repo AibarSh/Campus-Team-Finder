@@ -162,5 +162,5 @@ export const teamManagementApi = {
 
 // Flow 4.5B — find users to invite
 export const userApi = {
-  search: (q) => apiFetch(`/api/users?q=${encodeURIComponent(q)}`),
+  search: (q, page = 1) => apiFetch(`/api/users?${new URLSearchParams({ q, page })}`),
 };
