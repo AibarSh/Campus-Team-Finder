@@ -68,6 +68,9 @@ function Header({ showProgress = false, progressStep = 0 }) {
             </button>
             <div className="relative">
               <button
+                type="button"
+                aria-label="Account menu"
+                aria-expanded={profileOpen}
                 onClick={() => {
                   closeNavigation();
                   setProfileOpen(!profileOpen);

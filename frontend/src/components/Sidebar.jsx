@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 
 const iconPaths = {
@@ -10,7 +10,6 @@ const iconPaths = {
   users:
     'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
   add: 'M12 4v16m8-8H4',
-  user: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
 };
 
 function Icon({ name }) {
@@ -27,7 +26,6 @@ const sidebarItems = [
   { path: '/applications', label: 'My Applications', icon: 'document' },
   { path: '/my-teams', label: 'My Teams', icon: 'users' },
   { path: '/teams/new', label: 'Create Team', icon: 'add' },
-  { path: '/profile', label: 'Profile', icon: 'user' },
 ];
 
 export function NavigationLinks({ onNavigate, className }) {
@@ -69,10 +67,7 @@ function Sidebar() {
 
       {user && (
         <div className="p-4 border-t border-slate-100">
-          <Link
-            to="/profile"
-            className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors"
-          >
+          <div className="flex items-center gap-3 p-2">
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {name?.[0]?.toUpperCase()}
             </div>
@@ -80,10 +75,7 @@ function Sidebar() {
               <div className="text-sm font-semibold text-slate-900 truncate">{name}</div>
               {user.faculty && <div className="text-xs text-slate-400 truncate">{user.faculty}</div>}
             </div>
-            <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
+          </div>
         </div>
       )}
     </aside>
