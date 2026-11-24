@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { teamManagementApi } from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 import { ErrorBox, Spinner } from '../components/Feedback';
+import Tabs from '../components/Tabs';
+import { useFocusRefresh } from '../lib/useFocusRefresh';
 
 const heading = { fontFamily: 'Outfit, sans-serif' };
+const tabs = [
+  { id: 'created', label: 'Created' },
+  { id: 'joined', label: 'Joined' },
+];
 
 // openRoles[].applications mixes applications and invitations
 const pendingApplicants = (team) =>
@@ -16,24 +22,72 @@ const primaryBtn =
   'px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200';
 const secondaryBtn =
   'px-4 py-2 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors';
+const cardClass =
+  'min-w-0 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-5 flex flex-col gap-4';
+
+function JoinedTeamCard({ team }) {
+  return (
+    <article className={cardClass}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-slate-900 font-semibold wrap-anywhere" style={heading}>{team.name}</h3>
+          {team.eventTarget && <p className="text-xs text-slate-500 wrap-anywhere">{team.eventTarget}</p>}
+        </div>
+        {team.status === 'CLOSED' && <StatusBadge status="RECRUITMENT_CLOSED" />}
+      </div>
+      <ul aria-label="Your roles" className="flex flex-1 flex-wrap gap-1.5 content-start">
+        {team.joinedRoles.map(({ id, role }) => (
+          <li key={id} className="max-w-full wrap-anywhere rounded-full bg-blue-50 px-2.5 py-1 text-xs text-blue-700">
+            {role.name}
+          </li>
+        ))}
+      </ul>
+      <div className="pt-3 border-t border-slate-100">
+        <Link to={`/teams/${team.id}`} className={`inline-block ${secondaryBtn}`}>
+          View Team
+        </Link>
+      </div>
+    </article>
+  );
+}
 
 export default function MyTeamsPage() {
-  const [teams, setTeams] = useState(null);
-  const [error, setError] = useState('');
+  const [params, setParams] = useSearchParams();
+  const [result, setResult] = useState(null);
+  const isJoined = params.get('tab') === 'joined';
+  const tab = isJoined ? 'joined' : 'created';
+  const refresh = useFocusRefresh();
+  const teams = result?.tab === tab ? result.teams : null;
+  const error = result?.tab === tab ? result.error : undefined;
 
   useEffect(() => {
-    teamManagementApi.getMyCreatedTeams().then(setTeams).catch((err) => setError(err.message));
-  }, []);
+    let active = true;
+    const load = tab === 'joined' ? teamManagementApi.getMyJoinedTeams : teamManagementApi.getMyCreatedTeams;
+    load()
+      .then((data) => { if (active) setResult({ tab, teams: data }); })
+      .catch((err) => { if (active) setResult({ tab, error: err.message }); });
+    return () => { active = false; };
+  }, [tab, refresh]);
+
+  const switchTab = (next) => {
+    if (next === tab) return;
+    setResult(null);
+    setParams((current) => {
+      const updated = new URLSearchParams(current);
+      if (next === 'joined') updated.set('tab', 'joined');
+      else updated.delete('tab');
+      return updated;
+    });
+  };
 
   return (
-    <main className="min-h-[calc(100vh-65px)] bg-slate-50 p-8">
+    <main className="min-h-[calc(100vh-65px)] bg-slate-50 p-4 sm:p-8">
       <div className="max-w-[1400px] mx-auto space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-slate-900 text-2xl font-bold" style={heading}>
               My Teams
             </h1>
-            <p className="text-slate-500 mt-1 text-sm">Teams you created.</p>
           </div>
           <Link to="/teams/new" className={`flex items-center gap-2 ${primaryBtn}`}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,9 +97,16 @@ export default function MyTeamsPage() {
           </Link>
         </div>
 
+        <Tabs tabs={tabs} active={tab} onChange={switchTab} />
         <ErrorBox message={error} />
         {!teams && !error && <Spinner />}
-        {teams && teams.length === 0 && (
+        {isJoined && teams?.length === 0 && (
+          <div className="rounded-2xl border border-slate-100 bg-white px-4 py-12 text-center">
+            <p className="font-semibold text-slate-700">You haven't joined a team yet</p>
+            <p className="mt-1 text-sm text-slate-500">Accepted applications and invitations will show up here.</p>
+          </div>
+        )}
+        {!isJoined && teams?.length === 0 && (
           <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
             <div className="text-4xl mb-3">🚀</div>
             <div className="text-slate-700 font-semibold mb-1">You haven't created a team yet</div>
@@ -57,12 +118,12 @@ export default function MyTeamsPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {teams?.map((team) => {
+          {isJoined ? teams?.map((team) => <JoinedTeamCard key={team.id} team={team} />) : teams?.map((team) => {
             const pending = pendingApplicants(team);
             return (
               <div
                 key={team.id}
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-5 flex flex-col gap-4"
+                className={cardClass}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">

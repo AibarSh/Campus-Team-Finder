@@ -212,6 +212,30 @@ async function listMyTeams(req, res, next) {
   }
 }
 
+async function listJoinedTeams(req, res, next) {
+  try {
+    const membership = { some: { userId: req.user.id, status: 'ACCEPTED' } };
+    const teams = await prisma.team.findMany({
+      where: { applications: membership },
+      select: {
+        id: true,
+        name: true,
+        eventTarget: true,
+        status: true,
+        openRoles: {
+          where: { applications: membership },
+          select: { id: true, role: { select: { name: true } } },
+          orderBy: [{ role: { name: 'asc' } }, { id: 'asc' }],
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    res.json(teams.map(({ openRoles, ...team }) => ({ ...team, joinedRoles: openRoles })));
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function listTeams(req, res, next) {
   try {
     const { skill, faculty } = req.query;
@@ -403,6 +427,7 @@ module.exports = {
   setOpenRoles,
   publishTeam,
   listMyTeams,
+  listJoinedTeams,
   listTeams,
   recommendTeams,
   closeRecruitment,

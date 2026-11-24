@@ -6,6 +6,7 @@ const {
   setOpenRoles,
   publishTeam,
   listMyTeams,
+  listJoinedTeams,
   listTeams,
   recommendTeams,
   closeRecruitment,
@@ -21,6 +22,7 @@ const router = express.Router();
 router.post('/', authRequired, profileRequired, createTeam);
 router.get('/', authRequired, profileRequired, listTeams);
 router.get('/mine', authRequired, listMyTeams);
+router.get('/joined', authRequired, listJoinedTeams);
 router.get('/recommended', authRequired, profileRequired, recommendTeams);
 router.get('/:id', authRequired, profileRequired, getTeam);
 router.get('/:id/roles/:roleId/candidates', authRequired, profileRequired, searchUsers);

@@ -159,6 +159,53 @@ test('GET /api/teams/mine lists teams created by the current user', async () => 
   expect(res.body[0].name).toBe('Team A');
 });
 
+test('Joined lists only the signed-in member’s accepted roles and groups them by team', async () => {
+  const student = await prisma.user.create({
+    data: { email: 'member@kbtu.kz', name: 'Member', profileComplete: true },
+  });
+  const other = await prisma.user.create({
+    data: { email: 'othermember@kbtu.kz', name: 'Other Member', profileComplete: true },
+  });
+  const design = await prisma.role.create({ data: { name: 'Design' } });
+  const make = (name, status) => prisma.team.create({
+    data: {
+      name, status, creatorId: owner.id,
+      openRoles: { create: [
+        { roleId: backendRole.id, slotsTotal: 1, slotsFilled: 1 },
+        { roleId: design.id, slotsTotal: 1, slotsFilled: 1 },
+      ] },
+    },
+    include: { openRoles: true },
+  });
+  const closed = await make('Closed team', 'CLOSED');
+  const full = await make('Full team', 'PUBLISHED');
+  const pending = await make('Pending team', 'PUBLISHED');
+  const entry = (team, roleId, direction, status, userId = student.id) => ({
+    teamId: team.id, teamOpenRoleId: team.openRoles.find((role) => role.roleId === roleId).id,
+    userId, direction, status,
+  });
+  await prisma.application.createMany({ data: [
+    entry(closed, backendRole.id, 'APPLICATION', 'ACCEPTED'),
+    entry(closed, backendRole.id, 'INVITATION', 'ACCEPTED'),
+    entry(closed, design.id, 'INVITATION', 'ACCEPTED'),
+    entry(full, design.id, 'INVITATION', 'ACCEPTED'),
+    entry(full, backendRole.id, 'INVITATION', 'ACCEPTED', other.id),
+    entry(pending, backendRole.id, 'APPLICATION', 'VIEWED'),
+    entry(pending, backendRole.id, 'INVITATION', 'SENT'),
+    entry(pending, design.id, 'APPLICATION', 'DECLINED'),
+    entry(pending, design.id, 'INVITATION', 'DECLINED'),
+  ] });
+  const api = request(createApp());
+  expect((await api.get('/api/teams/joined')).status).toBe(401);
+  const joined = await api.get('/api/teams/joined').set('Cookie', [`session=${signSessionToken(student.id)}`]);
+  expect(joined.status).toBe(200);
+  expect(joined.body).toHaveLength(2);
+  expect(joined.body.find(({ id }) => id === closed.id).joinedRoles.map(({ role }) => role.name))
+    .toEqual([backendRole.name, design.name]);
+  expect(joined.body.find(({ id }) => id === full.id).joinedRoles.map(({ role }) => role.name))
+    .toEqual([design.name]);
+});
+
 test('closes selected roles atomically with published team edits', async () => {
   const design = await prisma.role.create({ data: { name: 'Design' } });
   const team = await prisma.team.create({

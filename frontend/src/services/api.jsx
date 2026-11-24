@@ -162,6 +162,7 @@ export const teamManagementApi = {
     }),
 
   getMyCreatedTeams: () => apiFetch('/api/teams/mine'),
+  getMyJoinedTeams: () => apiFetch('/api/teams/joined'),
 
   getCandidates: (teamId, roleId, q, page) =>
     apiFetch(`/api/teams/${teamId}/roles/${roleId}/candidates?${new URLSearchParams({ q, page })}`),
