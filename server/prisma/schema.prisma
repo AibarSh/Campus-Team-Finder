@@ -170,8 +170,19 @@ model TeamOpenRole {
   team         Team          @relation(fields: [teamId], references: [id], onDelete: Cascade)
   role         Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
   applications Application[]
+  requiredSkills TeamOpenRoleRequiredSkill[]
 
   @@unique([teamId, roleId])
+}
+
+model TeamOpenRoleRequiredSkill {
+  teamOpenRoleId String
+  normalizedName String
+  name           String
+
+  teamOpenRole TeamOpenRole @relation(fields: [teamOpenRoleId], references: [id], onDelete: Cascade)
+
+  @@id([teamOpenRoleId, normalizedName])
 }
 
 model Application {

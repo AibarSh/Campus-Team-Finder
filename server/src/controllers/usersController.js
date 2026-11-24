@@ -1,7 +1,9 @@
 const { prisma } = require('../lib/prisma');
 const { AppError } = require('../errors');
 const { requireTeamOwner } = require('./teamsController');
-const { preferredRoleFields, prefersRole } = require('../lib/recruitmentMatching');
+const {
+  preferredRoleFields, requiredSkillFields, prefersRole, skillNames, countMatchingSkills,
+} = require('../lib/recruitmentMatching');
 
 const PAGE_SIZE = 10;
 
@@ -35,7 +37,7 @@ async function searchUsers(req, res, next) {
       await requireTeamOwner(req.params.id, req.user.id);
       openRole = await prisma.teamOpenRole.findUnique({
         where: { id: req.params.roleId, teamId: req.params.id },
-        include: { role: true },
+        include: { role: true, requiredSkills: requiredSkillFields },
       });
       if (!openRole) throw new AppError(404, 'Role not found on this team');
       if (openRole.slotsFilled >= openRole.slotsTotal) throw new AppError(409, 'This role has no open slots left');
@@ -64,8 +66,12 @@ async function searchUsers(req, res, next) {
     });
     if (openRole) {
       users = users
-        .map((user) => ({ user, preferred: prefersRole(user, openRole) }))
-        .sort((a, b) => Number(b.preferred) - Number(a.preferred))
+        .map((user) => ({
+          user,
+          preferred: Number(prefersRole(user, openRole)),
+          hits: openRole.requiredSkills.length ? countMatchingSkills(skillNames(user), openRole) : 0,
+        }))
+        .sort((a, b) => b.hits - a.hits || b.preferred - a.preferred)
         .slice(skip, skip + limit)
         .map(({ user: { preferredRoles, customRoles, ...user } }) => user);
     }

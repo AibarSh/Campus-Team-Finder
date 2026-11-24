@@ -135,7 +135,7 @@ export const teamManagementApi = {
   setOpenRoles: (teamId, roles) =>
     apiFetch(`/api/teams/${teamId}/roles`, {
       method: 'PUT',
-      body: JSON.stringify({ roles }), // [{ roleId, slotsTotal }]
+      body: JSON.stringify({ roles }),
     }),
 
   publishTeam: (teamId) =>

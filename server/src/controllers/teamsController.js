@@ -1,7 +1,11 @@
 const { prisma } = require('../lib/prisma');
 const { AppError } = require('../errors');
 const { FACULTIES } = require('../lib/profileOptions');
-const { preferredRoleFields, prefersRole } = require('../lib/recruitmentMatching');
+const {
+  preferredRoleFields, requiredSkillFields, normalizeName, skillNames, scoreRole, compareRoleScores,
+} = require('../lib/recruitmentMatching');
+
+const roleDetails = { role: true, requiredSkills: requiredSkillFields };
 
 async function requireTeamOwner(teamId, userId) {
   const team = await prisma.team.findUnique({ where: { id: teamId } });
@@ -49,7 +53,10 @@ async function setOpenRoles(req, res, next) {
     }
 
     const seenRoleIds = new Set();
-    for (const r of roles) {
+    const updates = roles.map((r) => {
+      if (!r || typeof r.roleId !== 'string' || !r.roleId) {
+        throw new AppError(400, 'roleId is required');
+      }
       if (!Number.isInteger(r.slotsTotal) || r.slotsTotal <= 0) {
         throw new AppError(400, 'slotsTotal must be a positive integer');
       }
@@ -57,25 +64,41 @@ async function setOpenRoles(req, res, next) {
         throw new AppError(400, 'duplicate roleId in roles array');
       }
       seenRoleIds.add(r.roleId);
-    }
+      if (r.requiredSkills === undefined) return r;
+      if (!Array.isArray(r.requiredSkills)) throw new AppError(400, 'requiredSkills must be an array of names');
+      const requiredSkills = new Map();
+      for (const value of r.requiredSkills) {
+        if (typeof value !== 'string' || !value.trim() || value.trim().length > 200) {
+          throw new AppError(400, 'Each required skill must have a name between 1 and 200 characters');
+        }
+        const name = value.trim();
+        const normalizedName = normalizeName(name);
+        if (!requiredSkills.has(normalizedName)) requiredSkills.set(normalizedName, { name, normalizedName });
+      }
+      return { ...r, requiredSkills: [...requiredSkills.values()] };
+    });
 
-    await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx) => {
       await tx.teamOpenRole.deleteMany({
         where: { teamId: team.id, roleId: { notIn: [...seenRoleIds] } },
       });
 
-      for (const r of roles) {
-        await tx.teamOpenRole.upsert({
+      for (const r of updates) {
+        const openRole = await tx.teamOpenRole.upsert({
           where: { teamId_roleId: { teamId: team.id, roleId: r.roleId } },
           update: { slotsTotal: r.slotsTotal },
           create: { teamId: team.id, roleId: r.roleId, slotsTotal: r.slotsTotal },
         });
+        if (r.requiredSkills !== undefined) {
+          await tx.teamOpenRoleRequiredSkill.deleteMany({ where: { teamOpenRoleId: openRole.id } });
+          if (r.requiredSkills.length) {
+            await tx.teamOpenRoleRequiredSkill.createMany({
+              data: r.requiredSkills.map((skill) => ({ ...skill, teamOpenRoleId: openRole.id })),
+            });
+          }
+        }
       }
-    });
-
-    const updated = await prisma.teamOpenRole.findMany({
-      where: { teamId: team.id },
-      include: { role: true },
+      return tx.teamOpenRole.findMany({ where: { teamId: team.id }, include: roleDetails });
     });
     res.json(updated);
   } catch (err) {
@@ -141,7 +164,7 @@ async function getTeam(req, res, next) {
   try {
     const team = await prisma.team.findUnique({
       where: { id: req.params.id },
-      include: { creator: true, openRoles: { include: { role: true } } },
+      include: { creator: true, openRoles: { include: roleDetails } },
     });
     if (!team) throw new AppError(404, 'Team not found');
     res.json(team);
@@ -154,17 +177,31 @@ async function recommendTeams(req, res, next) {
   try {
     const vacancies = { slotsFilled: { lt: prisma.teamOpenRole.fields.slotsTotal } };
     const [profile, teams] = await Promise.all([
-      prisma.user.findUniqueOrThrow({ where: { id: req.user.id }, select: preferredRoleFields }),
+      prisma.user.findUniqueOrThrow({
+        where: { id: req.user.id },
+        select: {
+          ...preferredRoleFields,
+          skills: { select: { skill: { select: { name: true } } } },
+          customSkills: { select: { name: true } },
+        },
+      }),
       prisma.team.findMany({
         where: { status: 'PUBLISHED', creatorId: { not: req.user.id }, openRoles: { some: vacancies } },
-        include: { creator: true, openRoles: { include: { role: true } } },
+        include: { creator: true, openRoles: { include: roleDetails } },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
     ]);
-    const matches = teams.filter((team) => team.openRoles.some(
-      (role) => role.slotsFilled < role.slotsTotal && prefersRole(profile, role),
-    ));
-    res.json({ personalized: matches.length > 0, teams: (matches.length ? matches : teams).slice(0, 2) });
+    const names = skillNames(profile);
+    const matches = teams
+      .map((team) => {
+        const eligibleRoles = team.openRoles.filter((role) => role.slotsFilled < role.slotsTotal);
+        const best = eligibleRoles.map((role) => scoreRole(profile, names, role)).sort(compareRoleScores)[0];
+        return { team, best };
+      })
+      .filter(({ best }) => best?.tier > 0)
+      .sort((a, b) => compareRoleScores(a.best, b.best));
+    const recommended = matches.length ? matches.slice(0, 2).map(({ team }) => team) : teams.slice(0, 2);
+    res.json({ personalized: matches.length > 0, teams: recommended });
   } catch (err) {
     next(err);
   }

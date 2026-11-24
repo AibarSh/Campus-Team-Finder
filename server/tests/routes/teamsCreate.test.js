@@ -129,6 +129,27 @@ test('GET /api/teams/mine lists teams created by the current user', async () => 
   expect(res.body[0].name).toBe('Team A');
 });
 
+test('saves distinct skill requirements per role and keeps them on legacy updates', async () => {
+  const team = await prisma.team.create({ data: { name: 'Requirements', creatorId: owner.id } });
+  const frontendRole = await prisma.role.create({ data: { name: 'Frontend' } });
+  const save = (requiredSkills) => request(createApp())
+    .put(`/api/teams/${team.id}/roles`)
+    .set('Cookie', [ownerCookie])
+    .send({ roles: [
+      { roleId: backendRole.id, slotsTotal: 1, requiredSkills },
+      { roleId: frontendRole.id, slotsTotal: 1 },
+    ] });
+
+  expect((await save(['  '])).status).toBe(400);
+  expect((await save([' Python ', 'python', 'Java', 'JavaScript'])).status).toBe(200);
+  expect((await save(undefined)).status).toBe(200);
+  const result = await request(createApp()).get(`/api/teams/${team.id}`).set('Cookie', [ownerCookie]);
+  expect(result.body.openRoles.find((role) => role.roleId === backendRole.id).requiredSkills.map(({ name }) => name))
+    .toEqual(['Java', 'JavaScript', 'Python']);
+  expect(result.body.openRoles.find((role) => role.roleId === frontendRole.id).requiredSkills).toEqual([]);
+  expect((await save([])).body.every((role) => role.requiredSkills.length === 0)).toBe(true);
+});
+
 test('PATCH /:id lets only the creator edit a draft team', async () => {
   const app = createApp();
   const team = (await request(app).post('/api/teams').set('Cookie', [ownerCookie]).send({ name: 'Old name' })).body;
