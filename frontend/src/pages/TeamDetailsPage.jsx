@@ -76,7 +76,7 @@ export default function TeamDetailsPage() {
   return (
     <main className="bg-slate-50 min-h-screen">
       {/* Breadcrumb bar */}
-      <div className="bg-white border-b border-slate-100 h-14 flex items-center px-8 gap-4">
+      <div className="bg-white border-b border-slate-100 min-h-14 flex items-center px-4 sm:px-8 gap-4">
         <Link
           to="/browse"
           className="flex items-center gap-2 text-slate-500 hover:text-slate-800 text-sm font-medium transition-colors"
@@ -86,8 +86,8 @@ export default function TeamDetailsPage() {
           </svg>
           Back to Browse
         </Link>
-        <div className="h-4 w-px bg-slate-200" />
-        <nav className="flex items-center gap-1 text-xs text-slate-400" aria-label="Breadcrumb">
+        <div className="hidden sm:block h-4 w-px bg-slate-200" />
+        <nav className="hidden sm:flex flex-wrap items-center gap-1 text-xs text-slate-400 wrap-anywhere" aria-label="Breadcrumb">
           <Link to="/dashboard" className="hover:text-slate-600 transition-colors">Dashboard</Link>
           <Chevron />
           <Link to="/browse" className="hover:text-slate-600 transition-colors">Browse Teams</Link>
@@ -98,21 +98,21 @@ export default function TeamDetailsPage() {
 
       {/* Hero */}
       <div
-        className="relative px-8 py-10 overflow-hidden"
+        className="relative px-4 py-6 sm:px-8 sm:py-10 overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #2563eb18 0%, #2563eb08 100%)' }}
       >
         <div
           className="absolute inset-0"
           style={{ background: 'radial-gradient(ellipse at 80% 50%, #2563eb12 0%, transparent 60%)' }}
         />
-        <div className="relative max-w-5xl flex items-start gap-5">
+        <div className="relative max-w-5xl flex items-start gap-3 sm:gap-5">
           <div
-            className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-2xl font-black flex-shrink-0 shadow-lg shadow-blue-200"
+            className="size-11 sm:size-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-2xl font-black shrink-0 shadow-lg shadow-blue-200"
             style={heading}
           >
             {team.name[0]?.toUpperCase()}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 wrap-anywhere">
             <div className="flex flex-wrap items-center gap-3 mb-2">
               {team.eventTarget && (
                 <span className="text-xs font-medium text-slate-500 bg-white border border-slate-200 px-3 py-1 rounded-full">
@@ -121,8 +121,8 @@ export default function TeamDetailsPage() {
               )}
               {team.status !== 'PUBLISHED' && <StatusBadge status={team.status} />}
             </div>
-            <div className="flex items-start justify-between gap-4">
-              <h1 className="text-slate-900 text-3xl font-bold mb-1" style={heading}>
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
+              <h1 className="text-slate-900 text-2xl sm:text-3xl font-bold mb-1" style={heading}>
                 {team.name}
               </h1>
               {isOwner && (
@@ -152,10 +152,10 @@ export default function TeamDetailsPage() {
       </div>
 
       {/* Content */}
-      <div className="px-8 py-8 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="p-4 sm:p-8 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
         {/* Open positions */}
         <section className="lg:col-span-2 space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-4">
             <h2 className="text-slate-900 font-bold" style={heading}>
               Open Positions
               <span className="ml-2 text-sm font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
@@ -182,15 +182,15 @@ export default function TeamDetailsPage() {
                     key={openRole.id}
                     className="p-4 rounded-xl border border-blue-100 bg-blue-50/40 hover:shadow-sm transition-shadow space-y-2"
                   >
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                           {openRole.role.name[0]?.toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 truncate">{openRole.role.name}</p>
+                          <p className="text-sm font-semibold text-slate-900 wrap-anywhere">{openRole.role.name}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <div className="w-20 h-1.5 bg-blue-100 rounded-full overflow-hidden">
+                            <div className="w-14 sm:w-20 h-1.5 bg-blue-100 rounded-full overflow-hidden">
                               <div className="h-full bg-blue-600 rounded-full" style={{ width: `${pct}%` }} />
                             </div>
                             <span className="text-xs text-slate-500">
@@ -201,7 +201,7 @@ export default function TeamDetailsPage() {
                       </div>
 
                       {!isOwner && (
-                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <div className="flex flex-col items-start gap-1 sm:items-end sm:shrink-0">
                           {status ? (
                             <StatusBadge status={status} />
                           ) : team.status === 'PUBLISHED' ? (

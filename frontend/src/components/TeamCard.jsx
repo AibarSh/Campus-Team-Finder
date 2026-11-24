@@ -3,10 +3,10 @@ import { displayName } from '../lib/names';
 
 export default function TeamCard({ team }) {
   return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition space-y-4 flex flex-col justify-between">
+    <div className="min-w-0 wrap-anywhere bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition space-y-4 flex flex-col justify-between">
       <div className="space-y-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-lg">
+          <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-lg">
             {team.name[0]?.toUpperCase()}
           </div>
           <div>

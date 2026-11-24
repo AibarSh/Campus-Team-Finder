@@ -30,35 +30,42 @@ const sidebarItems = [
   { path: '/profile', label: 'Profile', icon: 'user' },
 ];
 
+export function NavigationLinks({ onNavigate, className }) {
+  return (
+    <nav aria-label="Main navigation" className={className}>
+      {sidebarItems.map((item) => (
+        <NavLink
+          key={item.path}
+          to={item.path}
+          end
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+              isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <span className={isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}>
+                <Icon name={item.icon} />
+              </span>
+              <span className="flex-1 text-left">{item.label}</span>
+            </>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
 function Sidebar() {
   const { user } = useContext(UserContext);
   const name = user?.firstName ? [user.firstName, user.lastName].filter(Boolean).join(' ') : user?.name;
 
   return (
-    <aside className="w-64 border-r border-slate-100 bg-white sticky top-20 h-[calc(100vh-80px)] flex flex-col">
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {sidebarItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end
-            className={({ isActive }) =>
-              `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
-                isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span className={isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}>
-                  <Icon name={item.icon} />
-                </span>
-                <span className="flex-1 text-left">{item.label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
-      </nav>
+    <aside className="hidden md:flex w-64 shrink-0 border-r border-slate-100 bg-white sticky top-20 h-[calc(100vh-80px)] flex-col">
+      <NavigationLinks className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" />
 
       {user && (
         <div className="p-4 border-t border-slate-100">

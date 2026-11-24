@@ -68,14 +68,14 @@ export default function ProfilePage() {
   ].filter(Boolean);
 
   return (
-    <main className="bg-slate-50 min-h-screen p-8">
+    <main className="bg-slate-50 min-h-screen p-4 sm:p-8">
       <div className="max-w-3xl mx-auto space-y-4">
         {/* Header */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 space-y-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-5">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-8 space-y-5 wrap-anywhere">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-5">
               <div
-                className="w-20 h-20 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl font-bold select-none"
+                className="size-14 sm:size-20 shrink-0 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-2xl font-bold select-none"
                 style={heading}
               >
                 {initials(profile)}

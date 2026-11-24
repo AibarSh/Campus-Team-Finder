@@ -12,9 +12,10 @@ const STEPS = [
 ];
 
 const fieldClass =
-  'w-full px-4 rounded-xl border border-slate-200 text-slate-900 text-sm placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white';
-const inputClass = `${fieldClass} h-10`;
-const textareaClass = `${fieldClass} py-3 min-h-28 resize-none`;
+  'w-full rounded-xl border border-slate-200 text-slate-900 text-sm placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all bg-white';
+const inputClass = `${fieldClass} h-10 px-4`;
+const roleRowClass = 'grid grid-cols-[minmax(0,1fr)_3.75rem_2rem] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_6rem_2rem] sm:gap-3';
+const textareaClass = `${fieldClass} px-4 py-3 min-h-28 resize-none`;
 const labelClass = 'block text-sm font-medium text-slate-700 mb-1.5';
 
 // Remounts the wizard whenever the resumed draft id changes (e.g. navigating from
@@ -161,7 +162,7 @@ export default function CreateTeamWizard() {
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 space-y-6">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-8 space-y-6">
           <ErrorBox message={error} />
           {waitingForDraft && !error && <Spinner />}
 
@@ -208,15 +209,14 @@ export default function CreateTeamWizard() {
 
           {step === 2 && team && (
             <div className="space-y-3">
-              <div className="flex items-center gap-3 text-xs font-medium text-slate-400">
-                <span className="flex-1">Role</span>
-                <span className="w-24">Slots</span>
-                <span className="w-8" />
+              <div className={`${roleRowClass} text-xs font-medium text-slate-400`}>
+                <span>Role</span>
+                <span>Slots</span>
               </div>
               {rows.map((row, index) => (
-                <div key={index} className="flex items-center gap-3">
+                <div key={index} className={roleRowClass}>
                   <select
-                    className={`${inputClass} flex-1`}
+                    className={inputClass}
                     value={row.roleId}
                     onChange={(e) => updateRow(index, { roleId: e.target.value })}
                     aria-label="Role"
@@ -231,7 +231,7 @@ export default function CreateTeamWizard() {
                   <input
                     type="number"
                     min="1"
-                    className={`${inputClass} w-24`}
+                    className={`${fieldClass} h-10 min-w-0 px-2 sm:px-4`}
                     value={row.slotsTotal}
                     onChange={(e) => updateRow(index, { slotsTotal: parseInt(e.target.value, 10) || 0 })}
                     aria-label="Slots"
@@ -263,15 +263,15 @@ export default function CreateTeamWizard() {
             <div className="space-y-5 text-sm">
               <div>
                 <p className="text-xs font-medium text-slate-400 mb-1">Team</p>
-                <p className="text-slate-900 font-bold text-lg" style={heading}>
+                <p className="text-slate-900 font-bold text-lg wrap-anywhere" style={heading}>
                   {team.name}
                 </p>
-                {team.eventTarget && <p className="text-slate-500">{team.eventTarget}</p>}
+                {team.eventTarget && <p className="text-slate-500 wrap-anywhere">{team.eventTarget}</p>}
               </div>
               {team.description && (
                 <div>
                   <p className="text-xs font-medium text-slate-400 mb-1">Description</p>
-                  <p className="text-slate-600 leading-relaxed">{team.description}</p>
+                  <p className="text-slate-600 leading-relaxed wrap-anywhere">{team.description}</p>
                 </div>
               )}
               <div>
@@ -292,7 +292,7 @@ export default function CreateTeamWizard() {
         </div>
 
         {/* Nav buttons */}
-        <div className="flex items-center justify-between mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-6">
           {step > 1 ? (
             <button
               type="button"
@@ -309,7 +309,7 @@ export default function CreateTeamWizard() {
             <span />
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
             {step === 3 && (
               <button
                 type="button"

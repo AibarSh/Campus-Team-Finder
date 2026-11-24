@@ -7,7 +7,7 @@ export default function Layout({ children }) {
       <Header />
       <div className="flex flex-grow">
         <Sidebar />
-        <div className="flex-grow">{children}</div>
+        <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>
   );

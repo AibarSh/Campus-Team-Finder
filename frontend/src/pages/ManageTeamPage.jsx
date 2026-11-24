@@ -119,9 +119,9 @@ export default function ManageTeamPage() {
   }
 
   return (
-    <main className="min-h-[calc(100vh-65px)] bg-slate-50 p-8">
+    <main className="min-h-[calc(100vh-65px)] bg-slate-50 p-4 sm:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
           <div className="min-w-0">
             <Link
               to="/my-teams"
@@ -132,7 +132,7 @@ export default function ManageTeamPage() {
               </svg>
               My teams
             </Link>
-            <h1 className="text-slate-900 text-2xl font-bold mt-3" style={heading}>
+            <h1 className="text-slate-900 text-2xl font-bold mt-3 wrap-anywhere" style={heading}>
               {team.name}
             </h1>
             <div className="flex flex-wrap gap-1 pt-2">
@@ -146,7 +146,7 @@ export default function ManageTeamPage() {
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
             <StatusBadge status={team.status} />
             <Link
               to={`/teams/${team.id}`}
@@ -158,7 +158,7 @@ export default function ManageTeamPage() {
         </div>
 
         {team.status === 'DRAFT' && (
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm flex items-center justify-between gap-4">
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-100 text-amber-800 text-sm flex flex-wrap items-center justify-between gap-4">
             <span>This team is a draft and not visible to other students yet.</span>
             <Link to={`/teams/new?team=${team.id}`} className="font-semibold underline flex-shrink-0">
               Finish setup
@@ -170,7 +170,7 @@ export default function ManageTeamPage() {
         <ErrorBox message={error} />
 
         {tab === 'INVITATION' && (
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-3">
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-3">
             <h2 className="text-slate-900 font-bold text-sm" style={heading}>
               Invite students
             </h2>
@@ -204,7 +204,7 @@ export default function ManageTeamPage() {
               key={item.id}
               className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 space-y-2"
             >
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center lg:gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
@@ -213,7 +213,7 @@ export default function ManageTeamPage() {
                     {initials(item.user) || '?'}
                   </div>
                   <div className="space-y-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate" style={heading}>
+                    <p className="text-sm font-semibold text-slate-900 wrap-anywhere" style={heading}>
                       {displayName(item.user)}
                     </p>
                     <p className="text-xs text-slate-400">
@@ -222,7 +222,7 @@ export default function ManageTeamPage() {
                     <ProfileLinks user={item.user} />
                   </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex flex-wrap items-center gap-3 lg:shrink-0">
                   <StatusBadge status={item.status} />
                   {tab === 'APPLICATION' && ['SENT', 'VIEWED'].includes(item.status) && (
                     <DecisionButtons busy={busyId === item.id} onDecide={(status) => respond(item, status)} />

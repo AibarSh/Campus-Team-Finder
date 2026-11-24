@@ -62,10 +62,10 @@ export default function InvitePanel({ team, onInvited }) {
       {results && results.length === 0 && <p className="text-sm text-gray-500">No users found.</p>}
       {results?.map((u) => (
         <div key={u.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-2">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center lg:gap-4">
             <div className="min-w-0">
-              <p className="font-semibold text-gray-900">{displayName(u)}</p>
-              <p className="text-xs text-gray-400 truncate">
+              <p className="font-semibold text-gray-900 wrap-anywhere">{displayName(u)}</p>
+              <p className="text-xs text-gray-400 wrap-anywhere">
                 {[u.faculty, u.studyYear].filter(Boolean).join(' · ') || u.email}
               </p>
               <div className="flex flex-wrap gap-1 pt-1">
@@ -76,12 +76,12 @@ export default function InvitePanel({ team, onInvited }) {
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex max-w-full items-center gap-2 lg:shrink-0">
               <select
                 value={roleByUser[u.id] || team.openRoles[0].id}
                 onChange={(e) => setRoleByUser((prev) => ({ ...prev, [u.id]: e.target.value }))}
                 aria-label="Role to invite for"
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white"
+                className="min-w-0 px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white"
               >
                 {team.openRoles.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -93,7 +93,7 @@ export default function InvitePanel({ team, onInvited }) {
                 type="button"
                 disabled={busyUserId === u.id}
                 onClick={() => invite(u)}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                className="shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
               >
                 Invite
               </button>

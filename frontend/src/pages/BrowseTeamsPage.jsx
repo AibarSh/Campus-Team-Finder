@@ -32,7 +32,7 @@ export default function BrowseTeamsPage() {
   const count = `${teams.length} ${teams.length === 1 ? 'result' : 'results'}`;
 
   return (
-    <main className="min-h-[calc(100vh-65px)] bg-slate-50 p-8">
+    <main className="min-h-[calc(100vh-65px)] bg-slate-50 p-4 sm:p-8">
       <div className="max-w-[1400px] mx-auto space-y-6">
         <div>
           <h1 className="text-slate-900 text-2xl font-bold" style={heading}>
@@ -43,16 +43,16 @@ export default function BrowseTeamsPage() {
           </p>
         </div>
 
-        <div className="flex items-center justify-between gap-4 bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-3">
-          <div className="flex items-center gap-3">
-            <label htmlFor="roleFilter" className="text-sm font-medium text-slate-700">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-slate-100 shadow-sm px-4 sm:px-5 py-3">
+          <div className="flex min-w-0 max-w-full items-center gap-3">
+            <label htmlFor="roleFilter" className="shrink-0 text-sm font-medium text-slate-700">
               Open role
             </label>
             <select
               id="roleFilter"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-slate-200 text-sm bg-white text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all cursor-pointer"
+              className="min-w-0 h-9 px-3 rounded-lg border border-slate-200 text-sm bg-white text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all cursor-pointer"
             >
               <option value="">All roles</option>
               {role && !roles.some((r) => r.name === role) && <option value={role}>“{role}”</option>}

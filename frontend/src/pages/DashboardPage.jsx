@@ -57,17 +57,17 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-65px)] bg-slate-50">
-      <main className="flex-grow p-8 space-y-8 min-w-0">
+      <main className="flex-grow p-4 sm:p-8 space-y-8 min-w-0">
         {/* Welcome */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-slate-900 text-2xl font-bold" style={heading}>
+            <h1 className="text-slate-900 text-2xl font-bold wrap-anywhere" style={heading}>
               Good morning, {user?.firstName || user?.name} 👋
             </h1>
             <p className="text-slate-500 mt-1 text-sm">Here's what's happening with your team search today.</p>
           </div>
 
-          <div className="flex gap-3 flex-shrink-0">
+          <div className="flex flex-wrap gap-3">
             <Link
               to="/browse"
               className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
@@ -131,7 +131,7 @@ export default function DashboardPage() {
 
         {/* Recommended */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-slate-900 font-bold" style={heading}>
               Recommended for you
             </h2>
