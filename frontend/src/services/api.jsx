@@ -97,6 +97,7 @@ export const teamApi = {
   // server's `skill` param matches open role names
   getTeams: (filters = {}) => {
     const params = new URLSearchParams();
+    if (filters.q) params.append('q', filters.q);
     if (filters.role) params.append('skill', filters.role);
     if (filters.faculty) params.append('faculty', filters.faculty);
     const queryString = params.toString();

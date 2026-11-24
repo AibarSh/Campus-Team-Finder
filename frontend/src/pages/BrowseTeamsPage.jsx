@@ -6,29 +6,45 @@ import TeamCard from '../components/TeamCard';
 const heading = { fontFamily: 'Outfit, sans-serif' };
 
 export default function BrowseTeamsPage() {
-  const [teams, setTeams] = useState([]);
+  const [result, setResult] = useState(null);
   const [roles, setRoles] = useState([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get('q') || '';
+  const q = query.trim();
   const role = searchParams.get('role') || '';
-  const setRole = (value) => setSearchParams(value ? { role: value } : {});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const updateFilters = (filters, options) => {
+    const params = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    setSearchParams(params, options);
+  };
 
   useEffect(() => {
     lookupApi.getRoles().then(setRoles).catch(() => setRoles([]));
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setError('');
-    teamApi
-      .getTeams({ role })
-      .then(setTeams)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [role]);
+    let active = true;
+    const timer = setTimeout(() => {
+      teamApi.getTeams({ q, role })
+        .then((teams) => {
+          if (active) setResult({ q, role, teams });
+        })
+        .catch((err) => {
+          if (active) setResult({ q, role, error: err.message });
+        });
+    }, q ? 200 : 0);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [q, role]);
 
+  const loading = result?.q !== q || result?.role !== role;
+  const teams = loading ? [] : result.teams ?? [];
+  const error = loading ? '' : result.error;
   const count = `${teams.length} ${teams.length === 1 ? 'result' : 'results'}`;
 
   return (
@@ -44,6 +60,17 @@ export default function BrowseTeamsPage() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-slate-100 shadow-sm px-4 sm:px-5 py-3">
+          <div className="min-w-0 w-full sm:w-auto sm:flex-1">
+            <label htmlFor="teamSearch" className="sr-only">Search by team name or description</label>
+            <input
+              id="teamSearch"
+              type="search"
+              value={query}
+              onChange={(e) => updateFilters({ q: e.target.value }, { replace: true })}
+              placeholder="Search by team name or description…"
+              className="h-9 w-full px-3 rounded-lg border border-slate-200 text-sm bg-white text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"
+            />
+          </div>
           <div className="flex min-w-0 max-w-full items-center gap-3">
             <label htmlFor="roleFilter" className="shrink-0 text-sm font-medium text-slate-700">
               Open role
@@ -51,7 +78,7 @@ export default function BrowseTeamsPage() {
             <select
               id="roleFilter"
               value={role}
-              onChange={(e) => setRole(e.target.value)}
+              onChange={(e) => updateFilters({ role: e.target.value })}
               className="min-w-0 h-9 px-3 rounded-lg border border-slate-200 text-sm bg-white text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all cursor-pointer"
             >
               <option value="">All roles</option>
@@ -63,6 +90,11 @@ export default function BrowseTeamsPage() {
               ))}
             </select>
           </div>
+          {(query || role) && (
+            <button type="button" onClick={() => updateFilters({ q: '', role: '' })} className="text-sm font-medium text-blue-700 hover:underline">
+              Clear filters
+            </button>
+          )}
           <span className="text-xs text-slate-400 font-medium">{loading ? '' : count}</span>
         </div>
 
@@ -71,16 +103,7 @@ export default function BrowseTeamsPage() {
           <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
             <div className="text-4xl mb-3">🔍</div>
             <div className="text-slate-700 font-semibold mb-1">No teams match this filter</div>
-            <div className="text-slate-400 text-sm">Try another role, or clear the filter.</div>
-            {role && (
-              <button
-                type="button"
-                onClick={() => setRole('')}
-                className="mt-4 px-4 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Show all roles
-              </button>
-            )}
+            <div className="text-slate-400 text-sm">Try another search or role.</div>
           </div>
         )}
 

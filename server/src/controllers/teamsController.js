@@ -112,11 +112,14 @@ async function listMyTeams(req, res, next) {
 async function listTeams(req, res, next) {
   try {
     const { skill, faculty } = req.query;
+    const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const textMatch = { contains: query.replace(/[\\%_]/g, '\\$&'), mode: 'insensitive' };
     if (faculty && !FACULTIES.includes(faculty)) throw new AppError(400, 'faculty is not an allowed value');
     const teams = await prisma.team.findMany({
       where: {
         status: 'PUBLISHED',
         ...(faculty ? { creator: { faculty } } : {}),
+        ...(query ? { OR: [{ name: textMatch }, { description: textMatch }] } : {}),
         ...(skill
           ? { openRoles: { some: { role: { name: { contains: skill, mode: 'insensitive' } } } } }
           : {}),

@@ -26,17 +26,17 @@ beforeEach(async () => {
   });
 
   const published = await prisma.team.create({
-    data: { name: 'Published FIT Backend Team', creatorId: fitCreator.id, status: 'PUBLISHED' },
+    data: { name: 'Published FIT Backend Team', description: 'Ocean robotics prototype', creatorId: fitCreator.id, status: 'PUBLISHED' },
   });
   await prisma.teamOpenRole.create({ data: { teamId: published.id, roleId: backendRole.id, slotsTotal: 2 } });
 
   const draft = await prisma.team.create({
-    data: { name: 'Draft Team', creatorId: fitCreator.id, status: 'DRAFT' },
+    data: { name: 'Draft Team', description: 'Ocean robotics', creatorId: fitCreator.id, status: 'DRAFT' },
   });
   await prisma.teamOpenRole.create({ data: { teamId: draft.id, roleId: backendRole.id, slotsTotal: 1 } });
 
   const otherPublished = await prisma.team.create({
-    data: { name: 'Published ISE Frontend Team', creatorId: iseCreator.id, status: 'PUBLISHED' },
+    data: { name: 'Published ISE Frontend Team', description: 'Ocean forecasting prototype', creatorId: iseCreator.id, status: 'PUBLISHED' },
   });
   await prisma.teamOpenRole.create({ data: { teamId: otherPublished.id, roleId: frontendRole.id, slotsTotal: 1 } });
 });
@@ -61,6 +61,19 @@ test('filters by skill (matches open role name)', async () => {
   const res = await request(createApp()).get('/api/teams?skill=front').set('Cookie', [cookie]);
   expect(res.status).toBe(200);
   expect(res.body.map((t) => t.name)).toEqual(['Published ISE Frontend Team']);
+});
+
+test('matches a partial name or description and combines the text with the role filter', async () => {
+  const search = (q, skill) => request(createApp()).get('/api/teams').set('Cookie', [cookie]).query({ q, ...(skill ? { skill } : {}) });
+
+  const name = await search('  iSe FrOnT  ');
+  expect(name.body.map((t) => t.name)).toEqual(['Published ISE Frontend Team']);
+  const description = await search('rObOt');
+  expect(description.body.map((t) => t.name)).toEqual(['Published FIT Backend Team']);
+  const combined = await search('ocean', 'backend');
+  expect(combined.body.map((t) => t.name)).toEqual(['Published FIT Backend Team']);
+  expect((await search('robotics', 'frontend')).body).toEqual([]);
+  expect((await search('%')).body).toEqual([]);
 });
 
 test('GET /api/teams/:id returns team details with open roles', async () => {

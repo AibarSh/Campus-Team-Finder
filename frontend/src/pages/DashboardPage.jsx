@@ -38,7 +38,7 @@ export default function DashboardPage() {
   const handleSearch = (e) => {
     e.preventDefault();
     const q = query.trim();
-    navigate(q ? `/browse?role=${encodeURIComponent(q)}` : '/browse');
+    navigate(q ? `/browse?q=${encodeURIComponent(q)}` : '/browse');
   };
 
   useEffect(() => {
@@ -69,15 +69,6 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap gap-3">
             <Link
-              to="/browse"
-              className="flex items-center gap-2 px-4 py-2 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              Browse Teams
-            </Link>
-            <Link
               to="/teams/new"
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200"
             >
@@ -103,8 +94,8 @@ export default function DashboardPage() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search teams by role..."
-            aria-label="Search teams by role"
+            placeholder="Search by team name or description…"
+            aria-label="Search by team name or description"
             className="w-full h-10 pl-9 pr-4 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
           />
         </form>
