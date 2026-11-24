@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { teamApi } from '../services/api';
 import { displayName } from '../lib/names';
-import { hasVacancies, spotsRemaining } from '../lib/teamAvailability';
+import { hasVacancies, isRoleFull, roleAvailabilityStatus, spotsRemaining } from '../lib/teamAvailability';
 import { useFocusRefresh } from '../lib/useFocusRefresh';
 import StatusBadge from '../components/StatusBadge';
 import { ErrorBox, Spinner } from '../components/Feedback';
@@ -51,6 +51,10 @@ export default function TeamDetailsPage() {
       setMyApplications((prev) => [...prev.filter((item) => item.id !== application.id), application]);
     } catch (err) {
       setRoleErrors((prev) => ({ ...prev, [openRole.id]: err.message }));
+      if (err.status === 409) {
+        const latest = await teamApi.getTeamById(team.id).catch(() => null);
+        if (latest) setTeam(latest);
+      }
     } finally {
       setBusyRoleId(null);
     }
@@ -77,8 +81,9 @@ export default function TeamDetailsPage() {
 
   const totalSlots = team.openRoles.reduce((n, r) => n + r.slotsTotal, 0);
   const filledSlots = team.openRoles.reduce((n, r) => n + r.slotsFilled, 0);
-  const spotsOpen = team.openRoles.reduce((n, role) => n + spotsRemaining(role), 0);
-  const availableRoles = team.openRoles.filter(hasVacancies).length;
+  const spotsOpen = team.openRoles.reduce((n, role) => n + spotsRemaining(role, team.status), 0);
+  const availableRoles = team.openRoles.filter((role) => hasVacancies(role, team.status)).length;
+  const capacityStatus = team.openRoles.every(isRoleFull) ? 'FULL' : 'RECRUITMENT_CLOSED';
   const creatorName = displayName(team.creator);
 
   return (
@@ -127,8 +132,9 @@ export default function TeamDetailsPage() {
                   {team.eventTarget}
                 </span>
               )}
-              {team.status !== 'PUBLISHED' && <StatusBadge status={team.status} />}
-              {team.status === 'PUBLISHED' && spotsOpen === 0 && <StatusBadge status="FULL" />}
+              {team.status === 'DRAFT' && <StatusBadge status="DRAFT" />}
+              {team.status === 'CLOSED' && <StatusBadge status="RECRUITMENT_CLOSED" />}
+              {team.status === 'PUBLISHED' && spotsOpen === 0 && <StatusBadge status={capacityStatus} />}
             </div>
             <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
               <h1 className="text-slate-900 text-2xl sm:text-3xl font-bold mb-1" style={heading}>
@@ -173,7 +179,7 @@ export default function TeamDetailsPage() {
             </h2>
 
             {team.openRoles.length === 0 && <p className="text-sm text-slate-500">This team has no open roles yet.</p>}
-            {!isOwner && team.status !== 'PUBLISHED' && (
+            {!isOwner && team.status === 'DRAFT' && (
               <p className="text-sm text-slate-500">This team is not accepting applications yet.</p>
             )}
 
@@ -183,7 +189,7 @@ export default function TeamDetailsPage() {
                 const status = entry?.status;
                 const isPendingInvitation =
                   entry?.direction === 'INVITATION' && (status === 'SENT' || status === 'VIEWED');
-                const full = !hasVacancies(openRole);
+                const availability = roleAvailabilityStatus(openRole, team.status);
                 const pct = openRole.slotsTotal ? (openRole.slotsFilled / openRole.slotsTotal) * 100 : 0;
 
                 return (
@@ -209,11 +215,11 @@ export default function TeamDetailsPage() {
                         </div>
                       </div>
 
-                      {(full || !isOwner) && (
+                      {(availability || !isOwner) && (
                         <div className="flex flex-col items-start gap-1 sm:items-end sm:shrink-0">
-                          {full && <StatusBadge status="FULL" />}
+                          {availability && <StatusBadge status={availability} />}
                           {status && <StatusBadge status={status} />}
-                          {!isOwner && !status && !full && team.status === 'PUBLISHED' && (
+                          {!isOwner && !status && !availability && team.status === 'PUBLISHED' && (
                             <button
                               type="button"
                               disabled={busyRoleId === openRole.id}

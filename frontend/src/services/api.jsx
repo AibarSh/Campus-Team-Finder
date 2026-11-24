@@ -143,6 +143,9 @@ export const teamManagementApi = {
       method: 'POST',
     }),
 
+  closeRecruitment: (teamId, roleId) =>
+    apiFetch(`/api/teams/${teamId}${roleId ? `/roles/${roleId}` : ''}/close-recruitment`, { method: 'POST' }),
+
   getTeamApplications: (teamId, direction) =>
     apiFetch(`/api/teams/${teamId}/applications${direction === 'INVITATION' ? '?direction=INVITATION' : ''}`),
 

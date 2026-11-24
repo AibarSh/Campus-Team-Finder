@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { teamApi, teamManagementApi } from '../services/api';
 import { displayName, initials } from '../lib/names';
+import { hasVacancies, roleAvailabilityStatus } from '../lib/teamAvailability';
+import { statusLabel } from '../lib/statusLabel';
 import Tabs from '../components/Tabs';
 import StatusBadge from '../components/StatusBadge';
 import DecisionButtons from '../components/DecisionButtons';
@@ -60,6 +62,9 @@ export default function ManageTeamPage() {
   const [rowErrors, setRowErrors] = useState({});
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState('');
+  const [closing, setClosing] = useState(null);
+  const [closingBusy, setClosingBusy] = useState(false);
+  const [closingError, setClosingError] = useState('');
   const items = list?.tab === tab ? list.items : null;
 
   const loadTeam = useCallback(
@@ -97,6 +102,28 @@ export default function ManageTeamPage() {
       .then((items) => setList((prev) => prev?.tab === 'INVITATION' ? { ...prev, items } : prev))
       .catch((err) => setError(err.message)),
   ]), [id, loadTeam]);
+
+  const closeRecruitment = async () => {
+    setClosingBusy(true);
+    setClosingError('');
+    try {
+      const updated = await teamManagementApi.closeRecruitment(id, closing.role?.id);
+      setTeam(updated);
+      setNotice(closing.role ? `Recruitment closed for ${closing.role.role.name}.` : 'Team recruitment closed.');
+      setClosing(null);
+    } catch (err) {
+      setClosingError(err.message);
+      if (err.status === 409) await loadTeam();
+    } finally {
+      setClosingBusy(false);
+    }
+  };
+
+  const prepareClose = (role) => {
+    setClosingError('');
+    setNotice('');
+    setClosing({ role });
+  };
 
   const respond = async (item, status) => {
     setBusyId(item.id);
@@ -150,19 +177,19 @@ export default function ManageTeamPage() {
               {team.name}
             </h1>
             <div className="flex flex-wrap gap-1 pt-2">
-              {team.openRoles.map((r) => (
-                <span
-                  key={r.id}
-                  className="text-xs px-2.5 py-1 bg-white text-slate-600 rounded-full border border-slate-200 font-medium"
-                >
-                  {r.role.name} · {r.slotsFilled}/{r.slotsTotal}
-                </span>
-              ))}
+              {team.openRoles.map((r) => {
+                const status = roleAvailabilityStatus(r, team.status);
+                return (
+                  <span key={r.id} className="max-w-full wrap-anywhere text-xs px-2.5 py-1 bg-white text-slate-600 rounded-full border border-slate-200 font-medium">
+                    {r.role.name} · {r.slotsFilled}/{r.slotsTotal}{status && ` · ${statusLabel(status)}`}
+                  </span>
+                );
+              })}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
-            <StatusBadge status={team.status} />
-            {team.status === 'PUBLISHED' && !editing && (
+            <StatusBadge status={team.status === 'CLOSED' ? 'RECRUITMENT_CLOSED' : team.status} />
+            {team.status === 'PUBLISHED' && !editing && !closing && (
               <button
                 type="button"
                 onClick={() => { setEditing(true); setNotice(''); }}
@@ -200,6 +227,40 @@ export default function ManageTeamPage() {
               setNotice('Team updated.');
             }}
           />
+        )}
+
+        {team.status === 'PUBLISHED' && !editing && (
+          <details open={closing ? true : undefined} className="rounded-2xl border border-slate-100 bg-white p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-900">Recruitment controls</summary>
+            {closing ? (
+              <div className="mt-3 space-y-3">
+                <p className="text-sm text-slate-700">
+                  {closing.role ? `Close recruitment for ${closing.role.role.name}?` : 'Close recruitment for the whole team?'}
+                  {' '}Existing applications and invitations can still be decided.
+                </p>
+                <ErrorBox message={closingError} />
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={closeRecruitment} disabled={closingBusy} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    Confirm closure
+                  </button>
+                  <button type="button" onClick={() => setClosing(null)} disabled={closingBusy} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {team.openRoles.filter((role) => hasVacancies(role, team.status)).map((role) => (
+                  <button key={role.id} type="button" onClick={() => prepareClose(role)} className="max-w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 wrap-anywhere">
+                    Close recruitment for {role.role.name}
+                  </button>
+                ))}
+                <button type="button" onClick={() => prepareClose(null)} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
+                  Close team recruitment
+                </button>
+              </div>
+            )}
+          </details>
         )}
 
         <Tabs tabs={TABS} active={tab} onChange={switchTab} />

@@ -8,6 +8,7 @@ const {
   listMyTeams,
   listTeams,
   recommendTeams,
+  closeRecruitment,
   getTeam,
   applyToRole,
   listTeamApplications,
@@ -26,6 +27,8 @@ router.get('/:id/roles/:roleId/candidates', authRequired, profileRequired, searc
 router.post('/:id/roles/:roleId/apply', authRequired, profileRequired, applyToRole);
 router.get('/:id/applications', authRequired, listTeamApplications);
 router.post('/:id/invite', authRequired, profileRequired, inviteUser);
+router.post('/:id/close-recruitment', authRequired, profileRequired, closeRecruitment);
+router.post('/:id/roles/:roleId/close-recruitment', authRequired, profileRequired, closeRecruitment);
 router.patch('/:id', authRequired, profileRequired, updateTeam);
 router.put('/:id/roles', authRequired, profileRequired, setOpenRoles);
 router.post('/:id/publish', authRequired, profileRequired, publishTeam);

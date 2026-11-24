@@ -9,12 +9,14 @@ export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) 
   const [search, setSearch] = useState(null);
   const [busyUserId, setBusyUserId] = useState(null);
   const [inviteError, setInviteError] = useState('');
-  const openRoles = team.openRoles.filter(hasVacancies);
+  const openRoles = team.openRoles.filter((role) => hasVacancies(role, team.status));
   const selectedRole = openRoles.find((role) => role.id === selection.roleId) ?? openRoles[0];
   const teamId = team.id;
   const roleId = selectedRole?.id;
+  const requirements = JSON.stringify(selectedRole?.requiredSkills);
   const page = selection.roleId === roleId ? selection.page : 1;
-  const currentSearch = search?.query === query && search?.page === page && search?.roleId === roleId ? search : null;
+  const currentSearch = search?.query === query && search?.page === page
+    && search?.roleId === roleId && search?.requirements === requirements ? search : null;
   const setPage = (nextPage) => setSelection({ roleId, page: nextPage });
 
   useEffect(() => {
@@ -24,11 +26,11 @@ export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) 
       teamManagementApi
         .getCandidates(teamId, roleId, query, page)
         .then(({ users, hasNext }) => {
-          if (!cancelled) setSearch({ query, page, roleId, users, hasNext });
+          if (!cancelled) setSearch({ query, page, roleId, requirements, users, hasNext });
         })
         .catch((err) => {
           if (cancelled) return;
-          setSearch({ query, page, roleId, error: err.message });
+          setSearch({ query, page, roleId, requirements, error: err.message });
           if (err.status === 409) onAvailabilityChanged();
         });
     }, 300);
@@ -36,14 +38,16 @@ export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) 
       clearTimeout(handle);
       cancelled = true;
     };
-  }, [teamId, roleId, query, page, onAvailabilityChanged]);
+  }, [teamId, roleId, query, page, requirements, onAvailabilityChanged]);
 
   const feedback = inviteError && <p role="alert" className="text-xs text-red-600">{inviteError}</p>;
   if (!selectedRole) {
     return (
       <div className="space-y-2">
         {feedback}
-        <p className="text-sm text-gray-500">No roles have open slots.</p>
+        <p className="text-sm text-gray-500">
+          {team.status === 'CLOSED' ? 'Recruitment is closed for this team.' : 'No roles are recruiting.'}
+        </p>
       </div>
     );
   }

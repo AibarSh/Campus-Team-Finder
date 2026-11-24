@@ -1,6 +1,6 @@
 const { prisma } = require('../lib/prisma');
 const { AppError } = require('../errors');
-const { requireTeamOwner } = require('./teamsController');
+const { requireTeamOwner, assertTeamRecruiting, assertRoleRecruiting } = require('./teamsController');
 const {
   preferredRoleFields, requiredSkillFields, prefersRole, skillNames, countMatchingSkills,
 } = require('../lib/recruitmentMatching');
@@ -34,13 +34,14 @@ async function searchUsers(req, res, next) {
     const contains = { contains: q.replace(/[\\%_]/g, '\\$&'), mode: 'insensitive' };
     let openRole;
     if (req.params.roleId !== undefined) {
-      await requireTeamOwner(req.params.id, req.user.id);
+      const team = await requireTeamOwner(req.params.id, req.user.id);
       openRole = await prisma.teamOpenRole.findUnique({
         where: { id: req.params.roleId, teamId: req.params.id },
         include: { role: true, requiredSkills: requiredSkillFields },
       });
       if (!openRole) throw new AppError(404, 'Role not found on this team');
-      if (openRole.slotsFilled >= openRole.slotsTotal) throw new AppError(409, 'This role has no open slots left');
+      assertTeamRecruiting(team.status);
+      assertRoleRecruiting(openRole);
     }
     const limit = paginated ? PAGE_SIZE + 1 : 20;
     let users = await prisma.user.findMany({

@@ -6,6 +6,20 @@ const {
 } = require('../lib/recruitmentMatching');
 
 const roleDetails = { role: true, requiredSkills: requiredSkillFields };
+const recruitingRoles = () => ({
+  recruitmentClosed: false,
+  slotsFilled: { lt: prisma.teamOpenRole.fields.slotsTotal },
+});
+
+function assertTeamRecruiting(status) {
+  if (status === 'CLOSED') throw new AppError(409, 'Recruitment is closed for this team');
+  if (status !== 'PUBLISHED') throw new AppError(409, 'Publish the team before recruiting');
+}
+
+function assertRoleRecruiting(role) {
+  if (role.recruitmentClosed) throw new AppError(409, 'Recruitment is closed for this role');
+  if (role.slotsFilled >= role.slotsTotal) throw new AppError(409, 'This role has no open slots left');
+}
 
 async function requireTeamOwner(teamId, userId, db = prisma) {
   const team = await db.team.findUnique({ where: { id: teamId } });
@@ -206,7 +220,7 @@ async function listTeams(req, res, next) {
         ...(query ? { OR: [{ name: textMatch }, { description: textMatch }] } : {}),
         openRoles: {
           some: {
-            slotsFilled: { lt: prisma.teamOpenRole.fields.slotsTotal },
+            ...recruitingRoles(),
             ...(skill ? { role: { name: { contains: skill, mode: 'insensitive' } } } : {}),
           },
         },
@@ -235,7 +249,6 @@ async function getTeam(req, res, next) {
 
 async function recommendTeams(req, res, next) {
   try {
-    const vacancies = { slotsFilled: { lt: prisma.teamOpenRole.fields.slotsTotal } };
     const [profile, teams] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: req.user.id },
@@ -246,7 +259,7 @@ async function recommendTeams(req, res, next) {
         },
       }),
       prisma.team.findMany({
-        where: { status: 'PUBLISHED', creatorId: { not: req.user.id }, openRoles: { some: vacancies } },
+        where: { status: 'PUBLISHED', creatorId: { not: req.user.id }, openRoles: { some: recruitingRoles() } },
         include: { creator: true, openRoles: { include: roleDetails } },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       }),
@@ -254,7 +267,7 @@ async function recommendTeams(req, res, next) {
     const names = skillNames(profile);
     const matches = teams
       .map((team) => {
-        const eligibleRoles = team.openRoles.filter((role) => role.slotsFilled < role.slotsTotal);
+        const eligibleRoles = team.openRoles.filter((role) => !role.recruitmentClosed && role.slotsFilled < role.slotsTotal);
         const best = eligibleRoles.map((role) => scoreRole(profile, names, role)).sort(compareRoleScores)[0];
         return { team, best };
       })
@@ -267,15 +280,47 @@ async function recommendTeams(req, res, next) {
   }
 }
 
-async function requireVacantRole(tx, teamId, roleId) {
-  // Serialize the availability check with claims of the same role's seats.
+async function requireRecruitingRole(tx, teamId, roleId) {
+  // Hold the team and role locks through submission so neither can close between the check and insert.
+  const [team] = await tx.$queryRaw`SELECT "status" FROM "Team" WHERE "id" = ${teamId} FOR SHARE`;
+  if (!team) throw new AppError(404, 'Team not found');
   const [role] = await tx.$queryRaw`
-    SELECT "slotsFilled", "slotsTotal" FROM "TeamOpenRole"
+    SELECT "slotsFilled", "slotsTotal", "recruitmentClosed" FROM "TeamOpenRole"
     WHERE "id" = ${roleId} AND "teamId" = ${teamId}
     FOR UPDATE
   `;
   if (!role) throw new AppError(404, 'Role not found on this team');
-  if (role.slotsFilled >= role.slotsTotal) throw new AppError(409, 'This role has no open slots left');
+  assertTeamRecruiting(team.status);
+  assertRoleRecruiting(role);
+}
+
+async function closeRecruitment(req, res, next) {
+  try {
+    const { id, roleId } = req.params;
+    const updated = await prisma.$transaction(async (tx) => {
+      await lockTeam(tx, id);
+      const team = await requireTeamOwner(id, req.user.id, tx);
+      if (roleId) {
+        const role = await tx.teamOpenRole.findUnique({ where: { id: roleId, teamId: id } });
+        if (!role) throw new AppError(404, 'Role not found on this team');
+        if (team.status !== 'CLOSED' && !role.recruitmentClosed) {
+          assertTeamRecruiting(team.status);
+          const closed = await tx.teamOpenRole.updateMany({
+            where: { id: roleId, slotsFilled: { lt: tx.teamOpenRole.fields.slotsTotal } },
+            data: { recruitmentClosed: true },
+          });
+          if (!closed.count) throw new AppError(409, 'This role has no open slots left');
+        }
+      } else if (team.status !== 'CLOSED') {
+        assertTeamRecruiting(team.status);
+        await tx.team.update({ where: { id }, data: { status: 'CLOSED' } });
+      }
+      return tx.team.findUnique({ where: { id }, include: { creator: true, openRoles: { include: roleDetails } } });
+    });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
 }
 
 async function applyToRole(req, res, next) {
@@ -283,7 +328,7 @@ async function applyToRole(req, res, next) {
     const { id: teamId, roleId: teamOpenRoleId } = req.params;
     const userId = req.user.id;
     const application = await prisma.$transaction(async (tx) => {
-      await requireVacantRole(tx, teamId, teamOpenRoleId);
+      await requireRecruitingRole(tx, teamId, teamOpenRoleId);
       const declinedInvite = await tx.application.findFirst({
         where: { teamOpenRoleId, userId, direction: 'INVITATION', status: 'DECLINED' },
         select: { id: true },
@@ -329,7 +374,7 @@ async function inviteUser(req, res, next) {
 
     const team = await requireTeamOwner(req.params.id, req.user.id);
     const application = await prisma.$transaction(async (tx) => {
-      await requireVacantRole(tx, team.id, teamOpenRoleId);
+      await requireRecruitingRole(tx, team.id, teamOpenRoleId);
       return tx.application.create({
         data: { teamId: team.id, teamOpenRoleId, userId, direction: 'INVITATION' },
       });
@@ -343,6 +388,8 @@ async function inviteUser(req, res, next) {
 
 module.exports = {
   requireTeamOwner,
+  assertTeamRecruiting,
+  assertRoleRecruiting,
   createTeam,
   updateTeam,
   setOpenRoles,
@@ -350,6 +397,7 @@ module.exports = {
   listMyTeams,
   listTeams,
   recommendTeams,
+  closeRecruitment,
   getTeam,
   applyToRole,
   listTeamApplications,
