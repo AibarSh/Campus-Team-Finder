@@ -118,6 +118,31 @@ export const teamApi = {
     apiFetch(`/api/applications/mine${direction === 'INVITATION' ? '?direction=INVITATION' : ''}`),
 };
 
+async function getMyJoinedTeams() {
+  try {
+    return await apiFetch('/api/teams/joined');
+  } catch (err) {
+    // Older APIs interpret "joined" as a team ID and return 404.
+    if (err.status !== 404) throw err;
+  }
+
+  const [applications, invitations] = await Promise.all([
+    teamApi.getMyApplications(),
+    teamApi.getMyApplications('INVITATION'),
+  ]);
+  const teams = new Map();
+  for (const { status, team, teamOpenRole } of [...applications, ...invitations]) {
+    if (status !== 'ACCEPTED') continue;
+    if (!teams.has(team.id)) teams.set(team.id, { ...team, joinedRoles: new Map() });
+    const { id, role } = teamOpenRole;
+    teams.get(team.id).joinedRoles.set(id, { id, role: { name: role.name } });
+  }
+
+  return [...teams.values()].map(({ id, name, eventTarget, status, joinedRoles }) => ({
+    id, name, eventTarget, status, joinedRoles: [...joinedRoles.values()],
+  }));
+}
+
 // Flow 4 — Create & Manage Team API
 export const teamManagementApi = {
   createTeam: (teamData) =>
@@ -162,7 +187,7 @@ export const teamManagementApi = {
     }),
 
   getMyCreatedTeams: () => apiFetch('/api/teams/mine'),
-  getMyJoinedTeams: () => apiFetch('/api/teams/joined'),
+  getMyJoinedTeams,
 
   getCandidates: (teamId, roleId, q, page) =>
     apiFetch(`/api/teams/${teamId}/roles/${roleId}/candidates?${new URLSearchParams({ q, page })}`),
