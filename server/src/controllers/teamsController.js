@@ -120,9 +120,12 @@ async function listTeams(req, res, next) {
         status: 'PUBLISHED',
         ...(faculty ? { creator: { faculty } } : {}),
         ...(query ? { OR: [{ name: textMatch }, { description: textMatch }] } : {}),
-        ...(skill
-          ? { openRoles: { some: { role: { name: { contains: skill, mode: 'insensitive' } } } } }
-          : {}),
+        openRoles: {
+          some: {
+            slotsFilled: { lt: prisma.teamOpenRole.fields.slotsTotal },
+            ...(skill ? { role: { name: { contains: skill, mode: 'insensitive' } } } : {}),
+          },
+        },
       },
       include: { creator: true, openRoles: { include: { role: true } } },
       orderBy: { createdAt: 'desc' },
@@ -146,21 +149,30 @@ async function getTeam(req, res, next) {
   }
 }
 
+async function requireVacantRole(tx, teamId, roleId) {
+  // Serialize the availability check with claims of the same role's seats.
+  const [role] = await tx.$queryRaw`
+    SELECT "slotsFilled", "slotsTotal" FROM "TeamOpenRole"
+    WHERE "id" = ${roleId} AND "teamId" = ${teamId}
+    FOR UPDATE
+  `;
+  if (!role) throw new AppError(404, 'Role not found on this team');
+  if (role.slotsFilled >= role.slotsTotal) throw new AppError(409, 'This role has no open slots left');
+}
+
 async function applyToRole(req, res, next) {
   try {
-    const teamOpenRole = await prisma.teamOpenRole.findFirst({
-      where: { id: req.params.roleId, teamId: req.params.id },
-    });
-    if (!teamOpenRole) throw new AppError(404, 'Role not found on this team');
+    const { id: teamId, roleId: teamOpenRoleId } = req.params;
+    const userId = req.user.id;
+    const application = await prisma.$transaction(async (tx) => {
+      await requireVacantRole(tx, teamId, teamOpenRoleId);
+      const declinedInvite = await tx.application.findFirst({
+        where: { teamOpenRoleId, userId, direction: 'INVITATION', status: 'DECLINED' },
+        select: { id: true },
+      });
+      if (declinedInvite) throw new AppError(409, 'You already declined an invitation to this role');
 
-    const application = await prisma.application.create({
-      data: {
-        teamId: req.params.id,
-        teamOpenRoleId: teamOpenRole.id,
-        userId: req.user.id,
-        direction: 'APPLICATION',
-        status: 'SENT',
-      },
+      return tx.application.create({ data: { teamId, teamOpenRoleId, userId, direction: 'APPLICATION' } });
     });
     res.status(201).json(application);
   } catch (err) {
@@ -193,22 +205,16 @@ async function listTeamApplications(req, res, next) {
 async function inviteUser(req, res, next) {
   try {
     const { userId, teamOpenRoleId } = req.body;
-    if (!userId || !teamOpenRoleId) throw new AppError(400, 'userId and teamOpenRoleId are required');
+    if (typeof userId !== 'string' || !userId || typeof teamOpenRoleId !== 'string' || !teamOpenRoleId) {
+      throw new AppError(400, 'userId and teamOpenRoleId are required');
+    }
 
     const team = await requireTeamOwner(req.params.id, req.user.id);
-    const teamOpenRole = await prisma.teamOpenRole.findFirst({
-      where: { id: teamOpenRoleId, teamId: team.id },
-    });
-    if (!teamOpenRole) throw new AppError(404, 'Role not found on this team');
-
-    const application = await prisma.application.create({
-      data: {
-        teamId: team.id,
-        teamOpenRoleId: teamOpenRole.id,
-        userId,
-        direction: 'INVITATION',
-        status: 'SENT',
-      },
+    const application = await prisma.$transaction(async (tx) => {
+      await requireVacantRole(tx, team.id, teamOpenRoleId);
+      return tx.application.create({
+        data: { teamId: team.id, teamOpenRoleId, userId, direction: 'INVITATION' },
+      });
     });
     res.status(201).json(application);
   } catch (err) {

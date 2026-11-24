@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { teamApi } from '../services/api';
+import { useFocusRefresh } from '../lib/useFocusRefresh';
 import TeamCard from '../components/TeamCard';
 import UserProfileSidebar from '../components/UserProfileSidebar';
 
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
+  const refresh = useFocusRefresh();
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -42,13 +44,17 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    let active = true;
     Promise.all([teamApi.getTeams(), teamApi.getMyApplications()])
       .then(([t, a]) => {
+        if (!active) return;
         setTeams(t);
         setApplications(a);
+        setError('');
       })
-      .catch((err) => setError(err.message));
-  }, []);
+      .catch((err) => { if (active) setError(err.message); });
+    return () => { active = false; };
+  }, [refresh]);
 
   // Your own teams are not a recommendation.
   const recommended = teams.filter((t) => t.creatorId !== user?.id);

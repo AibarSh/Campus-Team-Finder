@@ -6,6 +6,7 @@ const STYLES = {
   DRAFT: 'bg-gray-100 text-gray-600',
   PUBLISHED: 'bg-blue-50 text-blue-600',
   CLOSED: 'bg-gray-100 text-gray-500',
+  FULL: 'bg-slate-100 text-slate-600',
 };
 
 export default function StatusBadge({ status }) {

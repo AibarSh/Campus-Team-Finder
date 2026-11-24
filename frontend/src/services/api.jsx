@@ -21,7 +21,9 @@ async function apiFetch(endpoint, options = {}) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
+    const error = new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   // Return empty object for 204 No Content

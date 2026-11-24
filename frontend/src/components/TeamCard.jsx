@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { displayName } from '../lib/names';
+import { hasVacancies, spotsRemaining } from '../lib/teamAvailability';
 
 export default function TeamCard({ team }) {
+  const remaining = team.openRoles.reduce((total, role) => total + spotsRemaining(role), 0);
   return (
     <div className="min-w-0 wrap-anywhere bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition space-y-4 flex flex-col justify-between">
       <div className="space-y-3">
@@ -22,13 +24,14 @@ export default function TeamCard({ team }) {
         <div className="flex flex-wrap gap-1.5 pt-2">
           {team.openRoles.map((openRole) => (
             <span key={openRole.id} className="px-2.5 py-1 bg-gray-50 border border-gray-200 text-gray-600 text-xs rounded-lg">
-              {openRole.role.name} · {openRole.slotsFilled}/{openRole.slotsTotal}
+              {openRole.role.name} · {openRole.slotsFilled}/{openRole.slotsTotal}{!hasVacancies(openRole) && ' · Full'}
             </span>
           ))}
         </div>
       </div>
 
       <div className="pt-4 border-t border-gray-100 space-y-3">
+        <p className="text-xs font-medium text-slate-600">{remaining} {remaining === 1 ? 'spot' : 'spots'} left</p>
         <p className="text-xs text-gray-400">
           Created by <span className="font-semibold text-gray-700">{displayName(team.creator)}</span>
         </p>

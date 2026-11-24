@@ -177,7 +177,11 @@ export default function ManageTeamPage() {
             {team.status === 'DRAFT' ? (
               <p className="text-sm text-slate-500">Publish the team before inviting people.</p>
             ) : (
-              <InvitePanel team={team} onInvited={(invitation) => setItems((prev) => [invitation, ...(prev || [])])} />
+              <InvitePanel
+                team={team}
+                onAvailabilityChanged={loadTeam}
+                onInvited={(invitation) => setItems((prev) => [invitation, ...(prev || [])])}
+              />
             )}
           </section>
         )}

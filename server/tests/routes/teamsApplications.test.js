@@ -66,6 +66,29 @@ test('a non-creator cannot invite users to the team', async () => {
   expect(res.status).toBe(403);
 });
 
+test('rejects a new invitation after the last slot is accepted and keeps the team and history readable', async () => {
+  await prisma.teamOpenRole.update({ where: { id: teamOpenRole.id }, data: { slotsTotal: 1 } });
+  const other = await prisma.user.create({ data: { email: 'other@kbtu.kz', name: 'Other' } });
+  const api = request(createApp());
+  const invite = (userId) => api.post(`/api/teams/${team.id}/invite`).set('Cookie', [ownerCookie])
+    .send({ userId, teamOpenRoleId: teamOpenRole.id });
+  const sent = await invite(applicant.id);
+  expect(sent.status).toBe(201);
+  const accepted = await api.patch(`/api/applications/${sent.body.id}`)
+    .set('Cookie', [`session=${signSessionToken(applicant.id)}`]).send({ status: 'ACCEPTED' });
+  expect(accepted.status).toBe(200);
+  const stale = await invite(other.id);
+  expect(stale.status).toBe(409);
+  expect(stale.body.error).toBe('This role has no open slots left');
+  const catalog = await api.get('/api/teams').set('Cookie', [ownerCookie]);
+  expect(catalog.body).toEqual([]);
+  const details = await api.get(`/api/teams/${team.id}`).set('Cookie', [ownerCookie]);
+  expect(details.body.openRoles).toMatchObject([{ slotsTotal: 1, slotsFilled: 1 }]);
+  const history = await api.get(`/api/teams/${team.id}/applications?direction=INVITATION`).set('Cookie', [ownerCookie]);
+  expect(history.body).toHaveLength(1);
+  expect(history.body[0]).toMatchObject({ id: sent.body.id, status: 'ACCEPTED' });
+});
+
 test('owner listing applications marks SENT ones VIEWED and leaves the rest alone', async () => {
   const other = await prisma.user.create({
     data: { email: 'other@kbtu.kz', name: 'Other', profileComplete: true },

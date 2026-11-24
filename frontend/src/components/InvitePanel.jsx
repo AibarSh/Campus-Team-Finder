@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
 import { teamManagementApi, userApi } from '../services/api';
 import { displayName } from '../lib/names';
+import { hasVacancies } from '../lib/teamAvailability';
 
-export default function InvitePanel({ team, onInvited }) {
+export default function InvitePanel({ team, onInvited, onAvailabilityChanged }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [searchError, setSearchError] = useState('');
   const [roleByUser, setRoleByUser] = useState({});
   const [busyUserId, setBusyUserId] = useState(null);
-  const [rowErrors, setRowErrors] = useState({});
+  const [inviteError, setInviteError] = useState('');
+  const openRoles = team.openRoles.filter(hasVacancies);
+  const canInvite = openRoles.length > 0;
 
   useEffect(() => {
+    if (!canInvite) return;
     let cancelled = false;
     const handle = setTimeout(() => {
       userApi
@@ -28,21 +32,30 @@ export default function InvitePanel({ team, onInvited }) {
       clearTimeout(handle);
       cancelled = true;
     };
-  }, [query]);
+  }, [query, canInvite]);
 
-  if (team.openRoles.length === 0) {
-    return <p className="text-sm text-gray-500">Add open roles before inviting people.</p>;
+  const feedback = inviteError && <p role="alert" className="text-xs text-red-600">{inviteError}</p>;
+  if (!canInvite) {
+    return (
+      <div className="space-y-2">
+        {feedback}
+        <p className="text-sm text-gray-500">No roles have open slots.</p>
+      </div>
+    );
   }
 
+  const selectedRole = (userId) => openRoles.find((role) => role.id === roleByUser[userId]) ?? openRoles[0];
+
   const invite = async (u) => {
-    const teamOpenRoleId = roleByUser[u.id] || team.openRoles[0].id;
+    const teamOpenRole = selectedRole(u.id);
     setBusyUserId(u.id);
-    setRowErrors((prev) => ({ ...prev, [u.id]: '' }));
+    setInviteError('');
     try {
-      const invitation = await teamManagementApi.inviteUser(team.id, u.id, teamOpenRoleId);
-      onInvited({ ...invitation, user: u, teamOpenRole: team.openRoles.find((r) => r.id === teamOpenRoleId) });
+      const invitation = await teamManagementApi.inviteUser(team.id, u.id, teamOpenRole.id);
+      onInvited({ ...invitation, user: u, teamOpenRole });
     } catch (err) {
-      setRowErrors((prev) => ({ ...prev, [u.id]: err.message }));
+      setInviteError(err.message);
+      if (err.status === 409) await onAvailabilityChanged();
     } finally {
       setBusyUserId(null);
     }
@@ -50,6 +63,7 @@ export default function InvitePanel({ team, onInvited }) {
 
   return (
     <div className="space-y-3">
+      {feedback}
       <input
         type="text"
         value={query}
@@ -78,12 +92,12 @@ export default function InvitePanel({ team, onInvited }) {
             </div>
             <div className="flex max-w-full items-center gap-2 lg:shrink-0">
               <select
-                value={roleByUser[u.id] || team.openRoles[0].id}
+                value={selectedRole(u.id).id}
                 onChange={(e) => setRoleByUser((prev) => ({ ...prev, [u.id]: e.target.value }))}
                 aria-label="Role to invite for"
                 className="min-w-0 px-3 py-1.5 rounded-lg border border-gray-200 text-xs bg-white"
               >
-                {team.openRoles.map((r) => (
+                {openRoles.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.role.name}
                   </option>
@@ -91,15 +105,14 @@ export default function InvitePanel({ team, onInvited }) {
               </select>
               <button
                 type="button"
-                disabled={busyUserId === u.id}
+                disabled={busyUserId !== null}
                 onClick={() => invite(u)}
                 className="shrink-0 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
               >
-                Invite
+                {busyUserId === u.id ? 'Inviting…' : 'Invite'}
               </button>
             </div>
           </div>
-          {rowErrors[u.id] && <p className="text-xs text-red-600">{rowErrors[u.id]}</p>}
         </div>
       ))}
     </div>
