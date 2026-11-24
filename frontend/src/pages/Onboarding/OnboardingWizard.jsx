@@ -153,8 +153,6 @@ export default function OnboardingWizard({ mode = 'create' }) {
         formData.skills.filter((s) => s.id === null).map((s) => ({ name: s.name, proficiency: s.level })),
       );
 
-      // TODO(backend): the second argument carries the free-text entries the person typed in.
-      // Until updateInterests / updatePreferredRoles (and the API) accept it, those are ignored.
       await profileApi.updateInterests(formData.interests, formData.customInterests);
       await profileApi.updatePreferredRoles(formData.roles, formData.customRoles);
 

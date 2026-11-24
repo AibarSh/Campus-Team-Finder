@@ -41,7 +41,7 @@ function Chips({ items, className }) {
   return (
     <div className="flex flex-wrap gap-2">
       {items.map((item) => (
-        <span key={item} className={`px-4 py-1.5 text-sm font-medium rounded-xl border ${className}`}>
+        <span key={item} className={`max-w-full wrap-anywhere px-4 py-1.5 text-sm font-medium rounded-xl border ${className}`}>
           {item}
         </span>
       ))}
@@ -135,13 +135,19 @@ export default function ProfilePage() {
         {/* Interests & roles */}
         <Card title="Interests">
           <Chips
-            items={profile.interests.map((i) => i.interest.name)}
+            items={[...new Set([
+              ...profile.interests.map((i) => i.interest.name),
+              ...(profile.customInterests ?? []).map((i) => i.name),
+            ])]}
             className="border-blue-100 bg-blue-50 text-blue-700"
           />
         </Card>
         <Card title="Preferred roles">
           <Chips
-            items={profile.preferredRoles.map((r) => r.role.name)}
+            items={[...new Set([
+              ...profile.preferredRoles.map((r) => r.role.name),
+              ...(profile.customRoles ?? []).map((r) => r.name),
+            ])]}
             className="border-emerald-100 bg-emerald-50 text-emerald-700"
           />
         </Card>

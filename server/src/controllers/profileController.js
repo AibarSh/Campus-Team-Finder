@@ -24,6 +24,29 @@ const PROFILE_SKILLS = {
   skills: { include: { skill: true } },
   customSkills: { select: { name: true, proficiency: true }, orderBy: { normalizedName: 'asc' } },
 };
+const CUSTOM_NAMES = { select: { name: true }, orderBy: { normalizedName: 'asc' } };
+
+// Serialize list replacements for the same profile, including when its lists are empty.
+const lockProfile = (client, userId) =>
+  client.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+
+function customNameRows(names, userId) {
+  if (names === undefined) return undefined;
+  if (!Array.isArray(names) || names.length > 10) {
+    throw new AppError(400, 'Provide up to 10 custom names');
+  }
+  const seen = new Set();
+  return names.map((value) => {
+    const name = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+    if (!name || name.length > 40 || name.includes('\0')) {
+      throw new AppError(400, 'Custom names must be 1 to 40 characters');
+    }
+    const normalizedName = name.toLowerCase();
+    if (seen.has(normalizedName)) throw new AppError(409, 'You already added this name');
+    seen.add(normalizedName);
+    return { userId, name, normalizedName };
+  });
+}
 
 function validateField(field, value) {
   if (value === null) return;
@@ -42,7 +65,9 @@ async function getProfile(req, res, next) {
       include: {
         ...PROFILE_SKILLS,
         interests: { include: { interest: true } },
+        customInterests: CUSTOM_NAMES,
         preferredRoles: { include: { role: true } },
+        customRoles: CUSTOM_NAMES,
       },
     });
     res.json(profile);
@@ -95,8 +120,7 @@ async function putSkills(req, res, next) {
 
     const userId = req.user.id;
     const updated = await prisma.$transaction(async (tx) => {
-      // Serialize replacements for the same profile, even when both lists are empty.
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+      await lockProfile(tx, userId);
       const catalog = await tx.skill.findMany({
         where: customEntries?.length ? undefined : { id: { in: skills.map((item) => item.skillId) } },
         select: { id: true, name: true },
@@ -143,20 +167,25 @@ async function putSkills(req, res, next) {
 
 async function putInterests(req, res, next) {
   try {
-    const interests = req.body.interests;
+    const { interests, customInterests } = req.body;
     if (!Array.isArray(interests)) throw new AppError(400, 'interests must be an array of interestId strings');
 
-    await prisma.$transaction([
-      prisma.userInterest.deleteMany({ where: { userId: req.user.id } }),
-      prisma.userInterest.createMany({
-        data: interests.map((interestId) => ({ userId: req.user.id, interestId })),
-      }),
-    ]);
-    const updated = await prisma.userInterest.findMany({
-      where: { userId: req.user.id },
-      include: { interest: true },
+    const userId = req.user.id;
+    const rows = customNameRows(customInterests, userId);
+    const updated = await prisma.$transaction(async (tx) => {
+      await lockProfile(tx, userId);
+      await tx.userInterest.deleteMany({ where: { userId } });
+      await tx.userInterest.createMany({ data: interests.map((interestId) => ({ userId, interestId })) });
+      if (rows !== undefined) {
+        await tx.userCustomInterest.deleteMany({ where: { userId } });
+        await tx.userCustomInterest.createMany({ data: rows });
+      }
+      return tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { interests: { include: { interest: true } }, customInterests: CUSTOM_NAMES },
+      });
     });
-    res.json(updated);
+    res.json(rows === undefined ? updated.interests : updated);
   } catch (err) {
     next(err);
   }
@@ -164,20 +193,25 @@ async function putInterests(req, res, next) {
 
 async function putPreferredRoles(req, res, next) {
   try {
-    const roles = req.body.roles;
+    const { roles, customRoles } = req.body;
     if (!Array.isArray(roles)) throw new AppError(400, 'roles must be an array of roleId strings');
 
-    await prisma.$transaction([
-      prisma.userPreferredRole.deleteMany({ where: { userId: req.user.id } }),
-      prisma.userPreferredRole.createMany({
-        data: roles.map((roleId) => ({ userId: req.user.id, roleId })),
-      }),
-    ]);
-    const updated = await prisma.userPreferredRole.findMany({
-      where: { userId: req.user.id },
-      include: { role: true },
+    const userId = req.user.id;
+    const rows = customNameRows(customRoles, userId);
+    const updated = await prisma.$transaction(async (tx) => {
+      await lockProfile(tx, userId);
+      await tx.userPreferredRole.deleteMany({ where: { userId } });
+      await tx.userPreferredRole.createMany({ data: roles.map((roleId) => ({ userId, roleId })) });
+      if (rows !== undefined) {
+        await tx.userCustomPreferredRole.deleteMany({ where: { userId } });
+        await tx.userCustomPreferredRole.createMany({ data: rows });
+      }
+      return tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { preferredRoles: { include: { role: true } }, customRoles: CUSTOM_NAMES },
+      });
     });
-    res.json(updated);
+    res.json(rows === undefined ? updated.preferredRoles : updated);
   } catch (err) {
     next(err);
   }

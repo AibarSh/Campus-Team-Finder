@@ -54,7 +54,9 @@ model User {
   skills         UserSkill[]
   customSkills   UserCustomSkill[]
   interests      UserInterest[]
+  customInterests UserCustomInterest[]
   preferredRoles UserPreferredRole[]
+  customRoles    UserCustomPreferredRole[]
   teamsCreated   Team[]              @relation("TeamCreator")
   applications   Application[]
 }
@@ -105,6 +107,16 @@ model UserInterest {
   @@id([userId, interestId])
 }
 
+model UserCustomInterest {
+  userId         String
+  normalizedName String
+  name           String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, normalizedName])
+}
+
 model Role {
   id   String @id @default(uuid())
   name String @unique
@@ -121,6 +133,16 @@ model UserPreferredRole {
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
+}
+
+model UserCustomPreferredRole {
+  userId         String
+  normalizedName String
+  name           String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, normalizedName])
 }
 
 model Team {

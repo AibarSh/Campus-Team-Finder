@@ -67,16 +67,16 @@ export const profileApi = {
       body: JSON.stringify({ skills, customSkills }),
     }),
 
-  updateInterests: (interestIds) =>
+  updateInterests: (interestIds, customInterests) =>
     apiFetch('/api/profile/interests', {
       method: 'PUT',
-      body: JSON.stringify({ interests: interestIds }),
+      body: JSON.stringify({ interests: interestIds, customInterests }),
     }),
 
-  updatePreferredRoles: (roleIds) =>
+  updatePreferredRoles: (roleIds, customRoles) =>
     apiFetch('/api/profile/preferred-roles', {
       method: 'PUT',
-      body: JSON.stringify({ roles: roleIds }),
+      body: JSON.stringify({ roles: roleIds, customRoles }),
     }),
 
   completeProfile: () =>

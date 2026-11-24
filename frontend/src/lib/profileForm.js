@@ -16,6 +16,8 @@ export function profileToFormData(profile) {
     skills: getProfileSkills(profile),
     interests: profile.interests.map((i) => i.interest.id),
     roles: profile.preferredRoles.map((r) => r.role.id),
+    customInterests: (profile.customInterests ?? []).map((i) => i.name),
+    customRoles: (profile.customRoles ?? []).map((r) => r.name),
     availability: profile.availability || '',
     links: {
       github: profile.githubUrl || '',

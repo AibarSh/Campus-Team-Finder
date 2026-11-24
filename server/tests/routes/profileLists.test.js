@@ -119,6 +119,31 @@ test('PUT /api/profile/preferred-roles replaces the preferred role set', async (
   expect(res.body[0].role.name).toBe('Backend');
 });
 
+test.each([
+  ['interests', 'interests', 'customInterests', 'interests', 'AI', 'Space Robotics'],
+  ['preferred-roles', 'roles', 'customRoles', 'preferredRoles', 'Backend', 'Mission Planner'],
+])('PUT /api/profile/%s persists custom and catalog values separately', async (path, catalogKey, customKey, profileKey, catalogName, customName) => {
+  const api = request(createApp());
+  const value = catalogKey === 'interests' ? aiInterest : backendRole;
+  const save = (data) => api.put(`/api/profile/${path}`).set('Cookie', [cookie]).send(data);
+  const profile = () => api.get('/api/profile').set('Cookie', [cookie]);
+  const saved = await save({ [catalogKey]: [value.id], [customKey]: [`  ${customName}  `] });
+  expect(saved.status).toBe(200);
+  expect((await profile()).body[customKey]).toEqual([{ name: customName }]);
+  expect((await profile()).body[profileKey]).toHaveLength(1);
+
+  const catalog = await api.get(`/api/lookups/${catalogKey}`).set('Cookie', [cookie]);
+  expect(catalog.body.map((row) => row.name)).toEqual([catalogName]);
+  expect((await save({ [catalogKey]: [value.id] })).body).toHaveLength(1);
+  expect((await profile()).body[customKey]).toEqual([{ name: customName }]);
+  expect((await save({ [catalogKey]: [], [customKey]: [customName, customName.toLowerCase()] })).status).toBe(409);
+
+  expect((await save({ [catalogKey]: [value.id], [customKey]: [] })).status).toBe(200);
+  const after = (await profile()).body;
+  expect(after[customKey]).toEqual([]);
+  expect(after[profileKey]).toHaveLength(1);
+});
+
 test('POST /api/profile/complete marks the profile complete', async () => {
   const res = await request(createApp()).post('/api/profile/complete').set('Cookie', [cookie]);
   expect(res.status).toBe(200);
