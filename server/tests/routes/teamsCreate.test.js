@@ -159,6 +159,36 @@ test('GET /api/teams/mine lists teams created by the current user', async () => 
   expect(res.body[0].name).toBe('Team A');
 });
 
+test('closes selected roles atomically with published team edits', async () => {
+  const design = await prisma.role.create({ data: { name: 'Design' } });
+  const team = await prisma.team.create({
+    data: {
+      name: 'Recruiting',
+      creatorId: owner.id,
+      status: 'PUBLISHED',
+      openRoles: { create: [{ roleId: backendRole.id, slotsTotal: 2 }, { roleId: design.id, slotsTotal: 1 }] },
+    },
+    include: { openRoles: true },
+  });
+  const backend = team.openRoles.find(({ roleId }) => roleId === backendRole.id);
+  const edit = (data) => request(createApp()).patch(`/api/teams/${team.id}`).set('Cookie', [ownerCookie]).send(data);
+  const invalid = await edit({ closeRoleIds: [backend.id], roles: [{ roleId: 'missing', slotsTotal: 1 }] });
+  expect(invalid.status).toBe(400);
+  expect(await prisma.teamOpenRole.findUnique({ where: { id: backend.id } })).toMatchObject({ recruitmentClosed: false });
+  expect((await edit({ closeRoleIds: ['missing'] })).status).toBe(404);
+  const saved = await edit({
+    description: 'Updated',
+    closeRoleIds: [backend.id],
+    roles: [{ roleId: backendRole.id, slotsTotal: 3 }],
+  });
+  expect(saved.status).toBe(200);
+  expect(saved.body).toMatchObject({ status: 'PUBLISHED', description: 'Updated' });
+  expect(saved.body.openRoles).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: backend.id, slotsTotal: 3, recruitmentClosed: true }),
+    expect.objectContaining({ roleId: design.id, recruitmentClosed: false }),
+  ]));
+});
+
 test('saves distinct skill requirements per role and keeps them on legacy updates', async () => {
   const team = await prisma.team.create({ data: { name: 'Requirements', creatorId: owner.id } });
   const frontendRole = await prisma.role.create({ data: { name: 'Frontend' } });

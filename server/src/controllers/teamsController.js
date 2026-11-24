@@ -49,11 +49,14 @@ async function createTeam(req, res, next) {
 async function updateTeam(req, res, next) {
   try {
     const { id } = req.params;
-    const { name, eventTarget, description, roles } = req.body;
+    const { name, eventTarget, description, roles, closeRoleIds = [] } = req.body;
     for (const value of [eventTarget, description]) {
       if (value !== undefined && value !== null && typeof value !== 'string') {
         throw new AppError(400, 'Event and description must be text or null');
       }
+    }
+    if (!Array.isArray(closeRoleIds) || closeRoleIds.some((roleId) => typeof roleId !== 'string' || !roleId)) {
+      throw new AppError(400, 'closeRoleIds must contain team role IDs');
     }
     const updates = roles === undefined ? [] : parseRoles(roles);
     const team = await prisma.$transaction(async (tx) => {
@@ -61,10 +64,12 @@ async function updateTeam(req, res, next) {
       const current = await requireTeamOwner(id, req.user.id, tx);
       const data = { eventTarget, description };
       if (current.status === 'DRAFT') {
+        if (closeRoleIds.length) throw new AppError(409, 'Publish the team before closing recruitment');
         if (typeof name !== 'string' || !name.trim()) throw new AppError(400, 'name is required');
         data.name = name;
       } else if (current.status === 'PUBLISHED') {
         if (name !== undefined && name !== current.name) throw new AppError(409, 'The published team name cannot be changed');
+        for (const roleId of new Set(closeRoleIds)) await closeTeamRole(tx, current, roleId);
         if (updates.length) await updatePublishedRoles(tx, id, updates);
       } else {
         throw new AppError(409, 'This team cannot be edited');
@@ -294,6 +299,18 @@ async function requireRecruitingRole(tx, teamId, roleId) {
   assertRoleRecruiting(role);
 }
 
+async function closeTeamRole(tx, team, roleId) {
+  const role = await tx.teamOpenRole.findUnique({ where: { id: roleId, teamId: team.id } });
+  if (!role) throw new AppError(404, 'Role not found on this team');
+  if (team.status === 'CLOSED' || role.recruitmentClosed) return;
+  assertTeamRecruiting(team.status);
+  const closed = await tx.teamOpenRole.updateMany({
+    where: { id: roleId, slotsFilled: { lt: tx.teamOpenRole.fields.slotsTotal } },
+    data: { recruitmentClosed: true },
+  });
+  if (!closed.count) throw new AppError(409, 'This role has no open slots left');
+}
+
 async function closeRecruitment(req, res, next) {
   try {
     const { id, roleId } = req.params;
@@ -301,16 +318,7 @@ async function closeRecruitment(req, res, next) {
       await lockTeam(tx, id);
       const team = await requireTeamOwner(id, req.user.id, tx);
       if (roleId) {
-        const role = await tx.teamOpenRole.findUnique({ where: { id: roleId, teamId: id } });
-        if (!role) throw new AppError(404, 'Role not found on this team');
-        if (team.status !== 'CLOSED' && !role.recruitmentClosed) {
-          assertTeamRecruiting(team.status);
-          const closed = await tx.teamOpenRole.updateMany({
-            where: { id: roleId, slotsFilled: { lt: tx.teamOpenRole.fields.slotsTotal } },
-            data: { recruitmentClosed: true },
-          });
-          if (!closed.count) throw new AppError(409, 'This role has no open slots left');
-        }
+        await closeTeamRole(tx, team, roleId);
       } else if (team.status !== 'CLOSED') {
         assertTeamRecruiting(team.status);
         await tx.team.update({ where: { id }, data: { status: 'CLOSED' } });

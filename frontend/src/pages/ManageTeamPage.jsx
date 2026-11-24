@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { teamApi, teamManagementApi } from '../services/api';
 import { displayName, initials } from '../lib/names';
-import { hasVacancies, roleAvailabilityStatus } from '../lib/teamAvailability';
+import { roleAvailabilityStatus } from '../lib/teamAvailability';
 import { statusLabel } from '../lib/statusLabel';
 import Tabs from '../components/Tabs';
 import StatusBadge from '../components/StatusBadge';
@@ -62,7 +62,7 @@ export default function ManageTeamPage() {
   const [rowErrors, setRowErrors] = useState({});
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState('');
-  const [closing, setClosing] = useState(null);
+  const [closing, setClosing] = useState(false);
   const [closingBusy, setClosingBusy] = useState(false);
   const [closingError, setClosingError] = useState('');
   const items = list?.tab === tab ? list.items : null;
@@ -78,7 +78,7 @@ export default function ManageTeamPage() {
   const isOwner = team?.creatorId === user.id;
 
   useEffect(() => {
-    if (!isOwner) return undefined;
+    if (!isOwner || editing) return undefined;
     let cancelled = false;
     teamManagementApi
       .getTeamApplications(id, tab)
@@ -87,7 +87,7 @@ export default function ManageTeamPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, tab, isOwner]);
+  }, [id, tab, isOwner, editing]);
 
   const switchTab = (next) => {
     if (next === tab) return;
@@ -107,10 +107,10 @@ export default function ManageTeamPage() {
     setClosingBusy(true);
     setClosingError('');
     try {
-      const updated = await teamManagementApi.closeRecruitment(id, closing.role?.id);
+      const updated = await teamManagementApi.closeRecruitment(id);
       setTeam(updated);
-      setNotice(closing.role ? `Recruitment closed for ${closing.role.role.name}.` : 'Team recruitment closed.');
-      setClosing(null);
+      setNotice('Team recruitment closed.');
+      setClosing(false);
     } catch (err) {
       setClosingError(err.message);
       if (err.status === 409) await loadTeam();
@@ -119,10 +119,10 @@ export default function ManageTeamPage() {
     }
   };
 
-  const prepareClose = (role) => {
+  const prepareClose = () => {
     setClosingError('');
     setNotice('');
-    setClosing({ role });
+    setClosing(true);
   };
 
   const respond = async (item, status) => {
@@ -230,110 +230,105 @@ export default function ManageTeamPage() {
         )}
 
         {team.status === 'PUBLISHED' && !editing && (
-          <details open={closing ? true : undefined} className="rounded-2xl border border-slate-100 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-900">Recruitment controls</summary>
+          <section aria-label="Team recruitment" className="rounded-2xl border border-slate-100 bg-white p-4">
             {closing ? (
-              <div className="mt-3 space-y-3">
+              <div className="space-y-3">
                 <p className="text-sm text-slate-700">
-                  {closing.role ? `Close recruitment for ${closing.role.role.name}?` : 'Close recruitment for the whole team?'}
-                  {' '}Existing applications and invitations can still be decided.
+                  Close recruitment for the whole team? Existing applications and invitations can still be decided.
                 </p>
                 <ErrorBox message={closingError} />
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={closeRecruitment} disabled={closingBusy} className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
                     Confirm closure
                   </button>
-                  <button type="button" onClick={() => setClosing(null)} disabled={closingBusy} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+                  <button type="button" onClick={() => setClosing(false)} disabled={closingBusy} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
                     Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {team.openRoles.filter((role) => hasVacancies(role, team.status)).map((role) => (
-                  <button key={role.id} type="button" onClick={() => prepareClose(role)} className="max-w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 wrap-anywhere">
-                    Close recruitment for {role.role.name}
-                  </button>
-                ))}
-                <button type="button" onClick={() => prepareClose(null)} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
-                  Close team recruitment
-                </button>
-              </div>
-            )}
-          </details>
-        )}
-
-        <Tabs tabs={TABS} active={tab} onChange={switchTab} />
-        <ErrorBox message={error} />
-
-        <section className="space-y-3">
-          {tab === 'INVITATION' && (
-            <h2 className="text-slate-900 font-bold text-sm" style={heading}>
-              Sent invitations
-            </h2>
-          )}
-          {!items && !error && <Spinner />}
-          {items && items.length === 0 && (
-            <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
-              <div className="text-slate-700 font-semibold mb-1">
-                {tab === 'APPLICATION' ? 'No applications yet' : 'No invitations sent yet'}
-              </div>
-              <div className="text-slate-400 text-sm">
-                {tab === 'APPLICATION' ? 'Applicants will show up here.' : 'Invite students to fill your open roles.'}
-              </div>
-            </div>
-          )}
-          {items?.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 space-y-2"
-            >
-              <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center lg:gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                    aria-hidden="true"
-                  >
-                    {initials(item.user) || '?'}
-                  </div>
-                  <div className="space-y-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 wrap-anywhere" style={heading}>
-                      {displayName(item.user)}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {[item.teamOpenRole.role.name, item.user.faculty, item.user.studyYear].filter(Boolean).join(' · ')}
-                    </p>
-                    <ProfileLinks user={item.user} />
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 lg:shrink-0">
-                  <StatusBadge status={item.status} />
-                  {tab === 'APPLICATION' && ['SENT', 'VIEWED'].includes(item.status) && (
-                    <DecisionButtons busy={busyId === item.id} onDecide={(status) => respond(item, status)} />
-                  )}
-                </div>
-              </div>
-              {rowErrors[item.id] && <p className="text-xs text-red-500">{rowErrors[item.id]}</p>}
-            </div>
-          ))}
-        </section>
-        {tab === 'INVITATION' && items && (
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-3">
-            <h2 className="text-slate-900 font-bold text-sm" style={heading}>
-              Invite students
-            </h2>
-            {team.status === 'DRAFT' ? (
-              <p className="text-sm text-slate-500">Publish the team before inviting people.</p>
-            ) : (
-              <InvitePanel
-                team={team}
-                onAvailabilityChanged={refreshInvitations}
-                onInvited={(invitation) => setList((prev) => prev?.tab === 'INVITATION'
-                  ? { ...prev, items: [invitation, ...prev.items] }
-                  : prev)}
-              />
+              <button type="button" onClick={prepareClose} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700">
+                Close team recruitment
+              </button>
             )}
           </section>
+        )}
+
+        {!editing && (
+          <>
+            <Tabs tabs={TABS} active={tab} onChange={switchTab} />
+            <ErrorBox message={error} />
+
+            <section className="space-y-3">
+              {tab === 'INVITATION' && (
+                <h2 className="text-slate-900 font-bold text-sm" style={heading}>
+                  Sent invitations
+                </h2>
+              )}
+              {!items && !error && <Spinner />}
+              {items && items.length === 0 && (
+                <div className="text-center py-12 bg-white rounded-2xl border border-slate-100">
+                  <div className="text-slate-700 font-semibold mb-1">
+                    {tab === 'APPLICATION' ? 'No applications yet' : 'No invitations sent yet'}
+                  </div>
+                  <div className="text-slate-400 text-sm">
+                    {tab === 'APPLICATION' ? 'Applicants will show up here.' : 'Invite students to fill your open roles.'}
+                  </div>
+                </div>
+              )}
+              {items?.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 space-y-2"
+                >
+                  <div className="flex flex-col items-start justify-between gap-3 lg:flex-row lg:items-center lg:gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                        aria-hidden="true"
+                      >
+                        {initials(item.user) || '?'}
+                      </div>
+                      <div className="space-y-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 wrap-anywhere" style={heading}>
+                          {displayName(item.user)}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {[item.teamOpenRole.role.name, item.user.faculty, item.user.studyYear].filter(Boolean).join(' · ')}
+                        </p>
+                        <ProfileLinks user={item.user} />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 lg:shrink-0">
+                      <StatusBadge status={item.status} />
+                      {tab === 'APPLICATION' && ['SENT', 'VIEWED'].includes(item.status) && (
+                        <DecisionButtons busy={busyId === item.id} onDecide={(status) => respond(item, status)} />
+                      )}
+                    </div>
+                  </div>
+                  {rowErrors[item.id] && <p className="text-xs text-red-500">{rowErrors[item.id]}</p>}
+                </div>
+              ))}
+            </section>
+            {tab === 'INVITATION' && items && (
+              <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-3">
+                <h2 className="text-slate-900 font-bold text-sm" style={heading}>
+                  Invite students
+                </h2>
+                {team.status === 'DRAFT' ? (
+                  <p className="text-sm text-slate-500">Publish the team before inviting people.</p>
+                ) : (
+                  <InvitePanel
+                    team={team}
+                    onAvailabilityChanged={refreshInvitations}
+                    onInvited={(invitation) => setList((prev) => prev?.tab === 'INVITATION'
+                      ? { ...prev, items: [invitation, ...prev.items] }
+                      : prev)}
+                  />
+                )}
+              </section>
+            )}
+          </>
         )}
       </div>
     </main>

@@ -9,6 +9,7 @@ export default function EditTeamForm({ team, onSaved, onCancel }) {
   const [event, setEvent] = useState(team.eventTarget ?? '');
   const [description, setDescription] = useState(team.description ?? '');
   const [changes, setChanges] = useState({});
+  const [closeRoleIds, setCloseRoleIds] = useState([]);
   const [added, setAdded] = useState([]);
   const [newRole, setNewRole] = useState('');
   const [catalog, setCatalog] = useState({ loading: true, options: [] });
@@ -59,6 +60,7 @@ export default function EditTeamForm({ team, onSaved, onCancel }) {
         eventTarget: event.trim() || null,
         description: description.trim() || null,
         roles: updates.map(({ roleId, slotsTotal }) => ({ roleId, slotsTotal, ...changes[roleId] })),
+        closeRoleIds,
       });
       onSaved(saved);
     } catch (err) {
@@ -116,6 +118,23 @@ export default function EditTeamForm({ team, onSaved, onCancel }) {
                 </p>
               ) : (
                 <RequiredSkillsInput skills={skills} catalog={catalog} onChange={(requiredSkills) => update(role, { requiredSkills })} />
+              )}
+              {!full && role.recruitmentClosed && (
+                <p className="text-sm font-medium text-amber-700">Recruitment closed</p>
+              )}
+              {!full && role.id && !role.recruitmentClosed && (
+                <label className="flex items-start gap-2 text-sm font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={closeRoleIds.includes(role.id)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setCloseRoleIds((ids) => checked ? [...ids, role.id] : ids.filter((id) => id !== role.id));
+                    }}
+                    className="mt-1 size-4 shrink-0 accent-blue-600"
+                  />
+                  Close recruitment on save
+                </label>
               )}
             </fieldset>
           );
